@@ -1,0 +1,144 @@
+---
+import Layout from '../components/layouts/Layout.astro';
+import { getLeaderboard } from '../services/graphql';
+
+// Fetch leaderboard data
+let leaderboardData = null;
+let error = null;
+
+try {
+  leaderboardData = await getLeaderboard(1, 20);
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Failed to fetch leaderboard';
+}
+---
+
+<Layout title="Leaderboard - Budedex">
+  <div class="container mx-auto px-4 py-8">
+    <div class="text-center mb-12 pixel__container bg-card p-8 rounded-none box-shadow-margin">
+      <h1 class="text-4xl font-bold mb-4 pixel-font uppercase tracking-wider">LEADERBOARD</h1>
+      <p class="text-xl max-w-2xl mx-auto uppercase regular-font">
+        SEE HOW YOU STACK UP AGAINST OTHER STRAIN ENTHUSIASTS. POINTS ARE EARNED BY COMPLETING STRAINS, ADDING FAVORITES, AND BUILDING YOUR WISHLIST.
+      </p>
+    </div>
+
+    {error && (
+      <div class="bg-destructive/15 text-destructive px-4 py-3 rounded-md mb-6">
+        <p>Error loading leaderboard: {error}</p>
+      </div>
+    )}
+
+    {leaderboardData && (
+      <div class="max-w-4xl mx-auto">
+        <!-- Current User Stats -->
+        {leaderboardData.leaderboard.currentUser && (
+          <div class="bg-primary/10 border border-primary/20 rounded-lg p-6 mb-8">
+            <h2 class="text-lg font-semibold mb-4">Your Position</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="text-center">
+                <div class="text-2xl font-bold text-primary">
+                  #{leaderboardData.leaderboard.currentUser.rank}
+                </div>
+                <div class="text-sm text-muted-foreground">Rank</div>
+              </div>
+              <div class="text-center">
+                <div class="text-2xl font-bold text-primary">
+                  {leaderboardData.leaderboard.currentUser.score}
+                </div>
+                <div class="text-sm text-muted-foreground">Points</div>
+              </div>
+              <div class="text-center">
+                <div class="text-2xl font-bold text-primary">
+                  {leaderboardData.leaderboard.currentUser.username}
+                </div>
+                <div class="text-sm text-muted-foreground">Username</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <!-- Leaderboard Table -->
+        <div class="rounded-xl border bg-card text-card-foreground shadow">
+          <div class="p-6">
+            <h2 class="text-xl font-semibold mb-6">Top Players</h2>
+            
+            <div class="space-y-4">
+              {leaderboardData.leaderboard.entries.map((entry: any, index: number) => (
+                <div class={`flex items-center justify-between p-4 rounded-lg ${
+                  index < 3 ? 'bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20' : 'bg-muted/50'
+                }`}>
+                  <div class="flex items-center space-x-4">
+                    <div class={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                      index === 0 ? 'bg-yellow-500 text-white' :
+                      index === 1 ? 'bg-gray-400 text-white' :
+                      index === 2 ? 'bg-amber-600 text-white' :
+                      'bg-muted text-muted-foreground'
+                    }`}>
+                      {entry.rank}
+                    </div>
+                    <div>
+                      <div class="font-medium">{entry.username}</div>
+                      <div class="text-sm text-muted-foreground">
+                        User ID: {entry.userId.substring(0, 8)}...
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="text-right">
+                    <div class="font-bold text-lg">{entry.score}</div>
+                    <div class="text-sm text-muted-foreground">points</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <!-- Scoring System -->
+        <div class="mt-12 bg-muted/50 rounded-lg p-8">
+          <h3 class="text-xl font-semibold mb-6">How Scoring Works</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="text-center">
+              <div class="text-3xl font-bold text-primary mb-2">10</div>
+              <div class="font-medium mb-1">Points</div>
+              <div class="text-sm text-muted-foreground">Per completed strain</div>
+            </div>
+            <div class="text-center">
+              <div class="text-3xl font-bold text-primary mb-2">2</div>
+              <div class="font-medium mb-1">Points</div>
+              <div class="text-sm text-muted-foreground">Per favorite strain</div>
+            </div>
+            <div class="text-center">
+              <div class="text-3xl font-bold text-primary mb-2">1</div>
+              <div class="font-medium mb-1">Point</div>
+              <div class="text-sm text-muted-foreground">Per wishlist item</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pagination -->
+        {leaderboardData.leaderboard.pageInfo.totalPages > 1 && (
+          <div class="flex justify-center mt-8 space-x-2">
+            {leaderboardData.leaderboard.pageInfo.hasPreviousPage && (
+              <a href={`/leaderboard?page=${leaderboardData.leaderboard.pageInfo.currentPage - 1}`} 
+                 class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground">
+                Previous
+              </a>
+            )}
+            
+            <span class="inline-flex items-center px-4 py-2 text-sm font-medium">
+              Page {leaderboardData.leaderboard.pageInfo.currentPage} of {leaderboardData.leaderboard.pageInfo.totalPages}
+            </span>
+            
+            {leaderboardData.leaderboard.pageInfo.hasNextPage && (
+              <a href={`/leaderboard?page=${leaderboardData.leaderboard.pageInfo.currentPage + 1}`}
+                 class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground">
+                Next
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+</Layout>

@@ -1,0 +1,44 @@
+---
+export interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+
+// Import global styles
+import '../../styles/globals.css';
+import PixelNavigation from '../PixelNavigation.astro';
+import PixelFooter from '../PixelFooter.astro';
+import PixelLoadingScreen from '../PixelLoadingScreen.astro';
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="description" content="Budedex - Cannabis strain database with detailed information, effects, and user tracking." />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+  </head>
+  <body class="pixel-font bg-background">
+    <!-- Loading Screen (appears on every page) -->
+    <PixelLoadingScreen />
+    
+    <PixelNavigation />
+
+    <main>
+      <slot />
+    </main>
+
+    <PixelFooter />
+
+    <style>
+      html {
+        font-family: system-ui, sans-serif;
+      }
+    </style>
+    
+  </body>
+</html>

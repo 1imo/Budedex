@@ -1,0 +1,32 @@
+---
+import Layout from '../components/layouts/Layout.astro';
+---
+
+<Layout title="Wishlist - Budedex">
+  <div class="container mx-auto px-4 py-8">
+    <div class="text-center mb-12">
+      <h1 class="text-4xl font-bold tracking-tight mb-4">Your Wishlist</h1>
+      <p class="text-xl text-muted-foreground max-w-2xl mx-auto">
+        Cannabis strains you want to try. Sign in to start building your wishlist.
+      </p>
+    </div>
+
+    <!-- Auth Required Message -->
+    <div class="max-w-md mx-auto text-center">
+      <div class="rounded-xl border bg-card text-card-foreground shadow p-8">
+        <h2 class="text-xl font-semibold mb-4">Sign In Required</h2>
+        <p class="text-muted-foreground mb-6">
+          Please sign in to view and manage your strain wishlist.
+        </p>
+        <div class="flex gap-4 justify-center">
+          <a href="/account/sign-in" class="inline-flex items-center justify-center rounded-md bg-primary px-6 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90">
+            Sign In
+          </a>
+          <a href="/account/sign-up" class="inline-flex items-center justify-center rounded-md border border-input bg-background px-6 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground">
+            Sign Up
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>

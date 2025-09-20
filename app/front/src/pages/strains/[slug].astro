@@ -1,0 +1,798 @@
+---
+import Layout from '../../components/layouts/Layout.astro';
+import { getStrain } from '../../services/graphql';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Button } from '../../components/ui/button';
+import StrainHoverCard from '../../components/StrainHoverCard.tsx';
+
+// Get strain slug from URL params
+const { slug } = Astro.params;
+
+// Fetch strain data
+let strain = null;
+let error = null;
+
+// Determine strain type with fallback logic
+const getStrainType = (strain: any) => {
+  if (strain?.strain_type && strain.strain_type !== 'Unknown') {
+    return strain.strain_type;
+  }
+  if (strain?.category && strain.category !== 'Unknown') {
+    return strain.category;
+  }
+  // Default based on common strain types
+  return 'HYBRID';
+};
+
+try {
+  if (slug) {
+    // First try direct name lookup
+    let result = await getStrain(slug);
+    
+    // If not found, try converting slug back to proper name format
+    if (!result.strain) {
+      // Convert slug to search-friendly format (handle special characters like colons)
+      const searchName = slug
+        .replace(/-colon-/g, ':')  // Convert -colon- back to :
+        .replace(/-/g, ' ')        // Convert hyphens to spaces
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+      
+      result = await getStrain(searchName);
+    }
+    
+    // If still not found, try searching for it
+    if (!result.strain) {
+      const { searchStrains } = await import('../services/graphql');
+      const searchResult = await searchStrains(slug.replace(/-colon-/g, ':').replace(/-/g, ' '), 1, 1);
+      if (searchResult.searchStrains?.strains?.length > 0) {
+        const foundStrain = searchResult.searchStrains.strains[0];
+        result = await getStrain(foundStrain.name);
+      }
+    }
+    
+    strain = result.strain;
+  }
+} catch (e) {
+  error = e instanceof Error ? e.message : 'Failed to fetch strain';
+}
+
+// If strain not found, show 404
+if (!strain && !error) {
+  return Astro.redirect('/404');
+}
+---
+
+<Layout title={strain ? `${strain.name} - Budedex` : 'Strain Not Found - Budedex'}>
+  <div class="container mx-auto px-4 py-8">
+    {error && (
+      <div class="bg-destructive/15 text-destructive px-4 py-3 rounded-md mb-6">
+        <p>Error loading strain: {error}</p>
+      </div>
+    )}
+
+    {strain && (
+      <div class="max-w-6xl mx-auto">
+
+        <!-- Main Content -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <!-- Main Info -->
+          <div class="lg:col-span-2 space-y-6">
+                    <!-- Header -->
+                    <div>
+                      <div class="flex items-center justify-between mb-2">
+                        <h1 class="text-4xl font-bold tracking-tight">{strain.name}</h1>
+                        {strain.rating && (
+                          <div class="flex items-center gap-2">
+                            <div class="relative">
+                              <div class="flex items-center gap-1" id="star-rating" data-rating={strain.rating}>
+                                <!-- Stars will be populated by JavaScript -->
+                              </div>
+                              <!-- PixelActUI Tooltip -->
+                              <div id="rating-tooltip" class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-white border-0 rounded-none text-xs pixel-font uppercase opacity-0 pointer-events-none transition-opacity duration-200 z-10 whitespace-nowrap" style="box-shadow: rgb(0, 0, 0) -4px 0px 0px 0px, rgb(0, 0, 0) 4px 0px 0px 0px, rgb(0, 0, 0) 0px 4px 0px 0px, rgb(0, 0, 0) 0px -4px 0px 0px, rgb(200, 200, 200) -4px 0px 0px 0px inset, rgb(200, 200, 200) 0px -4px 0px 0px inset; margin: 4px;">
+                                {strain.rating.toFixed(1)} / 5
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      <div class="mb-6 flex items-center gap-4">
+                        <span class="text-muted-foreground text-sm pixel-font uppercase">
+                          {getStrainType(strain)}
+                        </span>
+                        {strain.thc && (
+                          <span class="text-muted-foreground text-sm pixel-font uppercase">
+                            THC: {strain.thc.replace('THC ', '')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <!-- Description -->
+                    {strain.description && (
+                      <div class="bg-card rounded-none px-0 py-6">
+                        <h3 class="text-lg font-bold mb-4 pixel-font uppercase text-primary">Description</h3>
+                        <p class="text-foreground leading-relaxed regular-font">{strain.description}</p>
+                      </div>
+                    )}
+
+            <!-- Effects -->
+            {(strain.positive_effects || strain.negative_effects) && (
+              <div class="bg-card rounded-none px-0 py-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {strain.positive_effects && (
+                    <div>
+                      <h4 class="font-medium text-green-600 mb-3 pixel-font uppercase">Positive Effects</h4>
+                      <div class="flex flex-wrap gap-2">
+                        {strain.positive_effects.split(', ').map((effect: string) => (
+                          <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm regular-font">
+                            {effect.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {strain.negative_effects && (
+                    <div>
+                      <h4 class="font-medium text-red-600 mb-3 pixel-font uppercase">Side Effects</h4>
+                      <div class="flex flex-wrap gap-2">
+                        {strain.negative_effects.split(', ').map((effect: string) => (
+                          <span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm regular-font">
+                            {effect.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <!-- Flavors & Terpenes -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {strain.flavors && (
+                <div class="bg-card rounded-none px-0 py-6">
+                  <h3 class="text-lg font-bold mb-4 pixel-font uppercase text-purple-600">Flavor Profile</h3>
+                  <div class="flex flex-wrap gap-2">
+                    {strain.flavors.split(', ').map((flavor: string) => (
+                      <span class="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm regular-font">
+                        {flavor.trim()}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {strain.terpenes && (
+                <div class="bg-card rounded-none px-0 py-6">
+                  <h3 class="text-lg font-bold mb-4 pixel-font uppercase text-indigo-600">Terpene Profile</h3>
+                  <div class="flex flex-wrap gap-2">
+                    {strain.terpenes.split(', ').map((terpene: string) => (
+                      <span class="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm regular-font">
+                        {terpene.trim()}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <!-- Aliases -->
+            {strain.aliases && (
+              <div class="bg-card rounded-none px-0 py-6">
+                <h3 class="text-lg font-bold mb-4 pixel-font uppercase text-orange-600">Also Known As</h3>
+                <div class="flex flex-wrap gap-2">
+                  {strain.aliases.split(', ').map((alias: string) => (
+                    <span class="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm regular-font">
+                      {alias.trim()}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <!-- Medical Benefits -->
+            {strain.medical_benefits && (
+              <div class="bg-card rounded-none px-0 py-6">
+                <h3 class="text-lg font-bold mb-4 pixel-font uppercase text-primary">Medical Benefits</h3>
+                <div class="space-y-4">
+                  {strain.medical_benefits.split(', ').map((benefit: string) => {
+                    const match = benefit.trim().match(/^(.*?)\s*\((\d+)%\)$/);
+                    if (match) {
+                      const [, condition, percentage] = match;
+                      return (
+                        <div class="space-y-2">
+                          <div class="flex justify-between items-center">
+                            <span class="font-medium regular-font">{condition}</span>
+                            <span class="text-sm text-muted-foreground regular-font">{percentage}% of users</span>
+                          </div>
+                          <div class="w-full bg-blue-100 rounded-none h-2 overflow-hidden">
+                            <div 
+                              class="h-full bg-blue-500 rounded-none transition-all duration-300" 
+                              style={{width: `${percentage}%`}}
+                            ></div>
+                          </div>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div class="flex flex-wrap gap-2">
+                          <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm regular-font">
+                            {benefit.trim()}
+                          </span>
+                        </div>
+                      );
+                    }
+                  })}
+                </div>
+              </div>
+            )}
+
+          </div>
+
+          <!-- Sidebar -->
+          <div class="space-y-4">
+                    <!-- Image -->
+                    <div class="bg-card rounded-none">
+                      <img 
+                        src={`https://cdn.budedex.space/strains/${strain.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}.png`} 
+                        alt={strain.name}
+                        class="w-full h-64 object-contain rounded-none"
+                        onerror="this.src='https://cdn.budedex.space/strains/default.png'"
+                      />
+                    </div>
+
+            <!-- Quick Actions -->
+            <div class="bg-card rounded-none px-0 py-6">
+              <div class="flex gap-3">
+                <button id="heart-btn" class="flex-1 pixel__button pixel-destructive__button box-shadow-margin text-sm font-medium px-4 py-3 flex items-center justify-center pixel-font uppercase" title="Add to Favorites">
+                  LIKE
+                </button>
+                <button id="tick-btn" class="flex-1 pixel__button pixel-success__button box-shadow-margin text-sm font-medium px-4 py-3 flex items-center justify-center pixel-font uppercase" title="Mark as Complete">
+                  COMPLETE
+                </button>
+              </div>
+            </div>
+
+            <!-- Genetics -->
+            {(strain.parents || strain.children) && (
+              <div class="bg-card rounded-none px-0 py-4">
+                <div class="space-y-4">
+                  {strain.parents && (
+                    <div>
+                      <h4 class="font-medium text-black mb-3 pixel-font uppercase">Parents</h4>
+                      <div class="space-y-3">
+                        {strain.parents.split(', ').map((parent: string) => (
+                          <div class="relative genetics-hover-container">
+                            <a 
+                              href={`/strains/${parent.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}`}
+                              class="pixel__button pixel-default__button box-shadow-margin text-sm regular-font px-3 py-2 block text-center uppercase w-full"
+                              data-strain-name={parent.trim()}
+                            >
+                              {parent.trim()}
+                            </a>
+                            <!-- Hover Popover -->
+                            <div class="genetics-popover absolute bottom-full left-0 w-full mb-2 bg-white border-0 rounded-none p-3 opacity-0 pointer-events-none transition-opacity duration-200 z-50" style="box-shadow: rgb(0, 0, 0) -4px 0px 0px 0px, rgb(0, 0, 0) 4px 0px 0px 0px, rgb(0, 0, 0) 0px 4px 0px 0px, rgb(0, 0, 0) 0px -4px 0px 0px, rgb(200, 200, 200) -4px 0px 0px 0px inset, rgb(200, 200, 200) 0px -4px 0px 0px inset; margin: 4px;">
+                              <div class="text-xs pixel-font uppercase text-center">Loading...</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {strain.children && (
+                    <div>
+                      <h4 class="font-medium text-black mb-3 pixel-font uppercase">Children</h4>
+                      <div class="space-y-3">
+                        {strain.children.split(', ').map((child: string) => (
+                          <div class="relative genetics-hover-container">
+                            <a 
+                              href={`/strains/${child.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}`}
+                              class="pixel__button pixel-default__button box-shadow-margin text-sm regular-font px-3 py-2 block text-center uppercase w-full"
+                              data-strain-name={child.trim()}
+                            >
+                              {child.trim()}
+                            </a>
+                            <!-- Hover Popover -->
+                            <div class="genetics-popover absolute bottom-full left-0 w-full mb-2 bg-white border-0 rounded-none p-3 opacity-0 pointer-events-none transition-opacity duration-200 z-50" style="box-shadow: rgb(0, 0, 0) -4px 0px 0px 0px, rgb(0, 0, 0) 4px 0px 0px 0px, rgb(0, 0, 0) 0px 4px 0px 0px, rgb(0, 0, 0) 0px -4px 0px 0px, rgb(200, 200, 200) -4px 0px 0px 0px inset, rgb(200, 200, 200) 0px -4px 0px 0px inset; margin: 4px;">
+                              <div class="text-xs pixel-font uppercase text-center">Loading...</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <!-- Related Strains -->
+            {(strain.genetics?.parents?.length > 0 || strain.genetics?.children?.length > 0) && (
+              <div class="bg-card rounded-none px-0 py-6 mt-8">
+                <h3 class="text-lg font-bold mb-6 pixel-font uppercase text-primary">Related Strains</h3>
+                <div class="space-y-6">
+                  {strain.genetics.parents?.length > 0 && (
+                    <div>
+                      <h4 class="font-medium mb-3 pixel-font uppercase text-sm text-foreground">Parent Strains</h4>
+                      <div class="space-y-3">
+                        {strain.genetics.parents.map((parent: string) => (
+                          <StrainHoverCard 
+                            key={parent}
+                            strainName={parent}
+                            href={`/strains/${parent.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').trim()}`}
+                            className="pixel__button pixel-secondary__button box-shadow-margin text-sm px-4 py-2 uppercase regular-font block w-full text-left"
+                            client:load
+                          >
+                            {parent}
+                          </StrainHoverCard>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {strain.genetics.children?.length > 0 && (
+                    <div>
+                      <h4 class="font-medium mb-3 pixel-font uppercase text-sm text-foreground">Child Strains</h4>
+                      <div class="space-y-3">
+                        {strain.genetics.children.map((child: string) => (
+                          <StrainHoverCard 
+                            key={child}
+                            strainName={child}
+                            href={`/strains/${child.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').trim()}`}
+                            className="pixel__button pixel-secondary__button box-shadow-margin text-sm px-4 py-2 uppercase regular-font block w-full text-left"
+                            client:load
+                          >
+                            {child}
+                          </StrainHoverCard>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
+</Layout>
+
+<style>
+  .pixel-heart {
+    filter: drop-shadow(1px 1px 0px rgba(0,0,0,0.3));
+  }
+  
+  .pixel-star {
+    filter: drop-shadow(1px 1px 0px rgba(0,0,0,0.2));
+    flex-shrink: 0;
+  }
+  
+  .pixel-check {
+    filter: drop-shadow(1px 1px 0px rgba(0,0,0,0.2));
+    flex-shrink: 0;
+  }
+  
+</style>
+
+<script>
+  // Pass strain name from Astro to JavaScript
+  const STRAIN_NAME = `${strain?.name || 'Unknown'}`;
+  
+  document.addEventListener('DOMContentLoaded', () => {
+    const starRatingContainer = document.getElementById('star-rating');
+    const tooltip = document.getElementById('rating-tooltip');
+    
+    // Initialize genetics hover popovers
+    initGeneticsHovers();
+    
+    // Initialize button animations
+    initButtonAnimations();
+    
+    if (starRatingContainer) {
+      const rating = parseFloat(starRatingContainer.getAttribute('data-rating') || '0');
+      renderPixelStars(starRatingContainer, rating);
+      
+      // Add hover events for tooltip
+      if (tooltip) {
+        starRatingContainer.addEventListener('mouseenter', () => {
+          tooltip.style.opacity = '1';
+        });
+        
+        starRatingContainer.addEventListener('mouseleave', () => {
+          tooltip.style.opacity = '0';
+        });
+      }
+    }
+  });
+
+  function renderPixelStars(container, rating) {
+    container.innerHTML = '';
+    
+    for (let i = 1; i <= 5; i++) {
+      // Calculate fill percentage for this star
+      let fillPercentage = 0;
+      if (rating >= i) {
+        fillPercentage = 100; // Full star
+      } else if (rating > i - 1) {
+        fillPercentage = (rating - (i - 1)) * 100; // Partial star
+      }
+      
+      // Only show stars that have some fill
+      if (fillPercentage > 0) {
+        const starContainer = document.createElement('div');
+        starContainer.className = 'star-container';
+        starContainer.style.position = 'relative';
+        starContainer.style.display = 'inline-block';
+        
+        // Create single star with clipping for partial fill
+        const star = document.createElement('div');
+        star.style.width = `${fillPercentage}%`;
+        star.style.overflow = 'hidden';
+        star.style.color = '#fbbf24'; // yellow-400
+        star.innerHTML = `
+          <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" stroke="black" stroke-width="2" stroke-linejoin="miter" stroke-linecap="square" class="pixel-star">
+            <path d="M8 0L6 6H0L5 9L3 16L8 12L13 16L11 9L16 6H10L8 0Z"/>
+          </svg>
+        `;
+        
+        starContainer.appendChild(star);
+        container.appendChild(starContainer);
+      }
+    }
+  }
+
+  function initGeneticsHovers() {
+    const geneticsContainers = document.querySelectorAll('.genetics-hover-container');
+    
+    geneticsContainers.forEach(container => {
+      const button = container.querySelector('a[data-strain-name]');
+      const popover = container.querySelector('.genetics-popover');
+      
+      if (button && popover) {
+        const strainName = button.getAttribute('data-strain-name');
+        let strainData = null;
+        
+        button.addEventListener('mouseenter', async () => {
+          // Show popover immediately with loading state
+          popover.style.opacity = '1';
+          popover.style.pointerEvents = 'auto';
+          
+          // Fetch strain data if not already loaded
+          if (!strainData) {
+            // Show loading state
+            popover.innerHTML = '<div class="text-xs pixel-font uppercase text-center">Loading...</div>';
+            
+            try {
+              console.log('Fetching strain data for:', strainName);
+              
+              // Try multiple name variations
+              const nameVariations = [
+                strainName,                           // Original name
+                strainName.toUpperCase(),            // All uppercase (Rs11 → RS11)
+                strainName.toLowerCase(),            // All lowercase
+                // Proper case variations for common words
+                strainName.replace(/\bAnd\b/g, 'and').replace(/\bThe\b/g, 'the').replace(/\bOf\b/g, 'of'),
+                strainName.replace(/\band\b/g, 'And').replace(/\bthe\b/g, 'The').replace(/\bof\b/g, 'Of'),
+              ];
+              
+              let foundStrain = null;
+              
+              for (const variation of nameVariations) {
+                try {
+                  const response = await fetch('http://localhost:4003/api/gql', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      query: `
+                        query GetStrain($name: String!) {
+                          strain(name: $name) {
+                            name
+                            type
+                            rating
+                            thc
+                            top_effect
+                          }
+                        }
+                      `,
+                      variables: { name: variation }
+                    })
+                  });
+                  
+                  if (!response.ok) {
+                    console.log(`HTTP error for "${variation}":`, response.status);
+                    continue;
+                  }
+                  
+                  const data = await response.json();
+                  
+                  if (data.errors) {
+                    console.log(`GraphQL errors for "${variation}":`, data.errors);
+                    continue;
+                  }
+                  
+                  if (data.data?.strain) {
+                    foundStrain = data.data.strain;
+                    console.log(`✅ Found strain with variation "${variation}":`, foundStrain);
+                    break;
+                  } else {
+                    console.log(`❌ No strain data for "${variation}"`);
+                  }
+                } catch (fetchError) {
+                  console.log(`Network error for "${variation}":`, fetchError);
+                  continue;
+                }
+              }
+              
+              if (foundStrain) {
+                strainData = foundStrain;
+                popover.innerHTML = `
+                  <div class="text-xs pixel-font uppercase text-center">
+                    <div class="font-bold mb-1">${strainData.name}</div>
+                    <div class="text-gray-600 mb-1">${strainData.type || 'Unknown'}</div>
+                    ${strainData.rating ? `<div class="text-yellow-600 mb-1">★ ${strainData.rating.toFixed(1)}</div>` : ''}
+                    ${strainData.thc ? `<div class="text-green-600 mb-1">${strainData.thc}</div>` : ''}
+                    ${strainData.top_effect ? `<div class="text-blue-600">${strainData.top_effect}</div>` : ''}
+                  </div>
+                `;
+              } else {
+                console.log('❌ No strain found for any variation of:', strainName);
+                popover.innerHTML = '<div class="text-xs pixel-font uppercase text-center text-gray-600">Not in database</div>';
+              }
+            } catch (error) {
+              console.error('❌ Overall error fetching strain data for', strainName, ':', error);
+              popover.innerHTML = '<div class="text-xs pixel-font uppercase text-center text-red-600">Failed to load</div>';
+            }
+          } else {
+            // Data already loaded, just show it
+            console.log('Using cached data for:', strainName);
+          }
+        });
+        
+        button.addEventListener('mouseleave', () => {
+          popover.style.opacity = '0';
+          popover.style.pointerEvents = 'none';
+        });
+      }
+    });
+  }
+
+  function initButtonAnimations() {
+    const heartBtn = document.getElementById('heart-btn');
+    const tickBtn = document.getElementById('tick-btn');
+    
+    if (heartBtn) {
+      heartBtn.addEventListener('click', () => {
+        handleButtonClick(heartBtn, true); // true = isHeartBtn
+      });
+    }
+    
+    if (tickBtn) {
+      tickBtn.addEventListener('click', () => {
+        handleButtonClick(tickBtn, false); // false = isTickBtn
+      });
+    }
+  }
+
+  async function handleButtonClick(button, isHeartBtn) {
+    // Check if user is authenticated
+    const authToken = localStorage.getItem('auth_token');
+    if (!authToken) {
+      // Redirect to sign in if not authenticated
+      window.location.href = '/account/sign-in';
+      return;
+    }
+    
+    // Check current button state
+    const currentText = button.textContent.trim();
+    const isCurrentlyActive = currentText === 'LIKED' || currentText === 'SEEN';
+    
+    try {
+      if (isCurrentlyActive) {
+        // Remove from favorites/seen (reverse animation + DELETE API)
+        await handleRemoveAction(button, isHeartBtn);
+      } else {
+        // Add to favorites/seen (forward animation + POST API)
+        await handleAddAction(button, isHeartBtn);
+      }
+    } catch (error) {
+      console.error('API call failed:', error);
+      // Could add error toast here
+    }
+  }
+
+  async function handleAddAction(button, isHeartBtn) {
+    const endpoint = isHeartBtn ? '/api/rest/account/favourites' : '/api/rest/account/complete';
+    const authToken = localStorage.getItem('auth_token');
+    
+    try {
+      // Start animation
+      animateButtonClick(button, isHeartBtn);
+      
+      // Make API call
+      const response = await fetch(`http://localhost:4003${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          strain_name: STRAIN_NAME
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      console.log(`Successfully ${isHeartBtn ? 'liked' : 'marked as seen'}: ${STRAIN_NAME}`);
+    } catch (error) {
+      console.error('Failed to add action:', error);
+      // Revert animation on error
+      location.reload(); // Simple error recovery
+    }
+  }
+
+  async function handleRemoveAction(button, isHeartBtn) {
+    const endpoint = isHeartBtn ? '/api/rest/account/favourites' : '/api/rest/account/complete';
+    const authToken = localStorage.getItem('auth_token');
+    const originalText = isHeartBtn ? 'LIKE' : 'COMPLETE';
+    
+    try {
+      // Start reverse animation
+      animateButtonReverse(button, isHeartBtn, originalText);
+      
+      // Make DELETE API call
+      const response = await fetch(`http://localhost:4003${endpoint}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          strain_name: STRAIN_NAME
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      console.log(`Successfully removed ${isHeartBtn ? 'like' : 'seen'}: ${STRAIN_NAME}`);
+    } catch (error) {
+      console.error('Failed to remove action:', error);
+      // Revert animation on error
+      location.reload(); // Simple error recovery
+    }
+  }
+
+  function animateButtonClick(button, isHeartBtn) {
+    // Get the button's original color and text
+    const buttonColor = isHeartBtn ? '#dc2626' : '#22c55e'; // red-600 or green-500
+    const originalText = button.textContent;
+    
+    // Set button to clip the expanding circle
+    button.style.overflow = 'hidden';
+    button.style.position = 'relative';
+    
+    // Create white circle element
+    const circle = document.createElement('div');
+    circle.style.position = 'absolute';
+    circle.style.top = '50%';
+    circle.style.left = '50%';
+    circle.style.width = '10px';
+    circle.style.height = '10px';
+    circle.style.backgroundColor = 'white';
+    circle.style.borderRadius = '50%';
+    circle.style.transform = 'translate(-50%, -50%)';
+    circle.style.transition = 'width 0.4s ease-out, height 0.4s ease-out';
+    circle.style.zIndex = '10';
+    
+    button.appendChild(circle);
+    
+    // Phase 1: Circle balloons out to fill button
+    setTimeout(() => {
+      circle.style.width = '200px'; // Large enough to fill button
+      circle.style.height = '200px';
+    }, 10);
+    
+    // Phase 2: Transform to parent button style as white circle expands
+    setTimeout(() => {
+      // Change to parent button styling (white background, black borders, colored text)
+      button.className = button.className.replace(/pixel-destructive__button|pixel-success__button/g, 'pixel-default__button');
+      button.style.backgroundColor = 'white';
+      button.style.color = buttonColor; // Keep original button color for text
+    }, 100);
+    
+    setTimeout(() => {
+      // Phase 3: Circle disappears and final text appears
+      circle.remove();
+      
+      // Replace button text with final state text
+      button.textContent = isHeartBtn ? 'LIKED' : 'SEEN';
+      button.style.opacity = '0';
+      button.style.overflow = 'visible';
+      
+      // Smoother fade in for the final text and inset styling
+      button.style.transition = 'opacity 0.6s ease-in-out';
+      setTimeout(() => {
+        button.style.opacity = '1';
+        
+        // Add click listener for reverse animation
+        button.addEventListener('click', () => {
+          animateButtonReverse(button, isHeartBtn, originalText);
+        });
+      }, 50);
+    }, 500);
+  }
+
+  function animateButtonReverse(button, isHeartBtn, originalText) {
+    // Get original button classes and styling
+    const originalClasses = isHeartBtn 
+      ? 'flex-1 pixel__button pixel-destructive__button box-shadow-margin text-sm font-medium px-4 py-3 flex items-center justify-center pixel-font uppercase'
+      : 'flex-1 pixel__button pixel-success__button box-shadow-margin text-sm font-medium px-4 py-3 flex items-center justify-center pixel-font uppercase';
+    
+    // Set button to clip the expanding circle
+    button.style.overflow = 'hidden';
+    button.style.position = 'relative';
+    
+    // Create white circle element for reverse animation
+    const circle = document.createElement('div');
+    circle.style.position = 'absolute';
+    circle.style.top = '50%';
+    circle.style.left = '50%';
+    circle.style.width = '10px';
+    circle.style.height = '10px';
+    circle.style.backgroundColor = 'white';
+    circle.style.borderRadius = '50%';
+    circle.style.transform = 'translate(-50%, -50%)';
+    circle.style.transition = 'width 0.4s ease-out, height 0.4s ease-out';
+    circle.style.zIndex = '10';
+    
+    button.appendChild(circle);
+    
+    // Phase 1: Circle balloons out smoothly
+    setTimeout(() => {
+      circle.style.width = '200px';
+      circle.style.height = '200px';
+    }, 10);
+    
+    // Phase 2: Restore original button styling as white circle expands
+    setTimeout(() => {
+      button.className = originalClasses;
+      button.style.backgroundColor = ''; // Restore original colored background
+      button.style.color = ''; // Restore original white text color
+    }, 150);
+    
+    setTimeout(() => {
+      // Phase 3: Circle disappears and original text returns
+      circle.remove();
+      
+      // Restore original button text
+      button.textContent = originalText;
+      button.style.opacity = '0';
+      button.style.overflow = 'visible';
+      
+      // Smoother fade in for the original text
+      button.style.transition = 'opacity 0.8s ease-in-out';
+      setTimeout(() => {
+        button.style.opacity = '1';
+        
+        // Re-add click listener for forward animation
+        button.addEventListener('click', () => {
+          animateButtonClick(button, isHeartBtn);
+        });
+        
+        // Clean up
+        setTimeout(() => {
+          button.style.transition = '';
+          button.style.position = '';
+          button.style.overflow = '';
+        }, 200);
+      }, 50);
+    }, 500);
+  }
+</script>

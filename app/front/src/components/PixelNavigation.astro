@@ -1,0 +1,425 @@
+---
+// PixelActUI Navigation Component
+import SearchCommand from './SearchCommand.tsx';
+import AuthenticatedNav from './AuthenticatedNav.tsx';
+---
+
+<header class="bg-card">
+  <div class="container mx-auto px-4 py-6">
+    <div class="border-b-4 border-black pb-6">
+    <nav class="flex items-center justify-between">
+      <div class="flex items-center space-x-8">
+        <a href="/" class="text-2xl font-bold text-primary pixel-brand uppercase tracking-wider">
+          <span class="text-purple-600">BUD</span>EDEX
+        </a>
+        <div class="hidden md:flex space-x-6 items-center">
+          <a href="/strains" class="text-sm font-medium px-3 py-2 hover:text-primary transition-colors regular-font uppercase">
+            STRAINS
+          </a>
+          <a href="/leaderboard" class="text-sm font-medium px-3 py-2 hover:text-primary transition-colors regular-font uppercase">
+            LEADERBOARD
+          </a>
+          
+          <!-- Search Bar -->
+          <div class="relative flex-1 opacity-0 transition-opacity duration-200" id="search-container">
+            <form method="GET" action="/search" class="relative w-full">
+              <button 
+                type="submit"
+                class="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-primary transition-all duration-200"
+                id="search-icon-button"
+              >
+                <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" class="transition-transform duration-200" id="search-icon">
+                  <circle cx="6" cy="6" r="3"/>
+                  <path d="m11 11 3 3"/>
+                </svg>
+              </button>
+              <input 
+                type="text" 
+                name="q"
+                placeholder="SEARCH STRAINS..." 
+                class="pixel__button bg-white border-2 border-black rounded-none pl-12 pr-4 py-3 text-sm regular-font uppercase w-full placeholder:text-muted-foreground"
+                id="header-search-input"
+                autocomplete="off"
+              />
+            </form>
+            
+            <!-- Search Results Dropdown -->
+            <div 
+              id="search-results" 
+              class="absolute top-full left-0 w-full bg-white border-0 rounded-none mt-1 hidden z-50 max-h-80 overflow-y-auto"
+              style="box-shadow: rgb(0, 0, 0) -4px 0px 0px 0px, rgb(0, 0, 0) 4px 0px 0px 0px, rgb(0, 0, 0) 0px 4px 0px 0px, rgb(0, 0, 0) 0px -4px 0px 0px, rgb(200, 200, 200) -4px 0px 0px 0px inset, rgb(200, 200, 200) 0px -4px 0px 0px inset; margin: 4px; margin-left: 0px;"
+            >
+              <div id="search-loading" class="p-4 text-center text-muted-foreground text-sm uppercase pixel-font hidden">
+                SEARCHING...
+              </div>
+              <div id="search-empty" class="p-4 text-center text-muted-foreground text-sm uppercase pixel-font hidden">
+                NO RESULTS FOUND
+              </div>
+              <div id="search-items" class="divide-y divide-gray-200"></div>
+              <div id="search-view-all" class="border-t-2 border-gray-200 p-3 text-center hidden">
+                <a href="#" class="text-sm font-medium text-primary hover:underline uppercase pixel-font">
+                  VIEW ALL RESULTS
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Auth Buttons -->
+      <div class="flex items-center space-x-4" id="auth-buttons">
+        <!-- Not authenticated state -->
+        <div id="auth-not-logged-in" class="flex items-center space-x-3">
+          <a href="/account/sign-in" class="pixel__button pixel-secondary__button box-shadow-margin text-sm font-medium px-4 py-2 uppercase">
+            SIGN IN
+          </a>
+          <a 
+            href="/account/sign-up" 
+            style="
+              all: unset;
+              background-color: #008001;
+              color: white;
+              font-weight: 600;
+              font-size: 14px;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              text-transform: uppercase;
+              letter-spacing: 0.025em;
+              box-shadow: -4px 0px 0px 0px #000000, 4px 0px 0px 0px #000000, 0px 4px 0px 0px #000000, 0px -4px 0px 0px #000000, -4px -1px 0px 0px #000000, 1px -4px 0px 0px #000000, 4px 1px 0px 0px #000000, -1px 4px 0px 0px #000000, -4px 0px 0px 0px #0B4B0A inset, 0px -4px 0px 0px #0B4B0A inset;
+              margin: 4px 4px 4px 8px;
+              padding: 7px 16px;
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              cursor: pointer;
+              transition: all 0.1s;
+              border: none;
+              text-decoration: none;
+              position: relative;
+            "
+            onmouseover="this.style.transform='translateY(1px)'"
+            onmouseout="this.style.transform='translateY(0px)'"
+          >
+            SIGN UP
+          </a>
+        </div>
+
+        <!-- Authenticated state -->
+        <div id="auth-logged-in" class="hidden">
+          <div id="authenticated-nav-mount"></div>
+        </div>
+      </div>
+    </nav>
+    </div>
+  </div>
+</header>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // Auth state management
+    function getAuthState() {
+      const token = localStorage.getItem('auth_token');
+      const userStr = localStorage.getItem('user');
+      
+      if (!token || !userStr) {
+        return { isAuthenticated: false, user: null, token: null };
+      }
+
+      try {
+        const user = JSON.parse(userStr);
+        return { isAuthenticated: true, user, token };
+      } catch {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user');
+        return { isAuthenticated: false, user: null, token: null };
+      }
+    }
+
+    async function logout() {
+      const authState = getAuthState();
+      
+      if (authState.token) {
+        try {
+          await fetch('http://localhost:4003/api/rest/account/logout', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${authState.token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+        } catch (error) {
+          console.error('Logout API call failed:', error);
+        }
+      }
+      
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('user');
+      window.location.href = '/';
+    }
+
+    // Update UI based on auth state
+    const authState = getAuthState();
+    const notLoggedIn = document.getElementById('auth-not-logged-in');
+    const loggedIn = document.getElementById('auth-logged-in');
+    const userAvatar = document.getElementById('user-avatar');
+    const logoutButton = document.getElementById('logout-button');
+
+    if (authState.isAuthenticated && authState.user) {
+      notLoggedIn?.classList.add('hidden');
+      loggedIn?.classList.remove('hidden');
+      
+      // Dynamically render the AuthenticatedNav React component
+      const mountPoint = document.getElementById('authenticated-nav-mount');
+      if (mountPoint && authState.user.username) {
+        // Import React and ReactDOM
+        Promise.all([
+          import('react'),
+          import('react-dom/client'),
+          import('./AuthenticatedNav.tsx')
+        ]).then(([React, ReactDOM, { default: AuthenticatedNav }]) => {
+          const root = ReactDOM.createRoot(mountPoint);
+          root.render(React.createElement(AuthenticatedNav, { 
+            username: authState.user.username 
+          }));
+        }).catch(error => {
+          console.error('Failed to load React components, using fallback:', error);
+          // Fallback to simple HTML with working dropdown
+          mountPoint.innerHTML = `
+            <div class="flex items-center space-x-4">
+              <div class="relative">
+                <button id="stash-btn-fallback" class="pixel__button pixel-default__button box-shadow-margin text-sm font-medium px-3 py-2 uppercase">
+                  STASH
+                </button>
+                <div id="stash-menu-fallback" class="absolute top-full left-0 mt-1 bg-white border-0 rounded-none hidden z-50 min-w-40" style="box-shadow: rgb(0, 0, 0) -4px 0px 0px 0px, rgb(0, 0, 0) 4px 0px 0px 0px, rgb(0, 0, 0) 0px 4px 0px 0px, rgb(0, 0, 0) 0px -4px 0px 0px, rgb(200, 200, 200) -4px 0px 0px 0px inset, rgb(200, 200, 200) 0px -4px 0px 0px inset; margin: 4px;">
+                  <a href="/favourites" class="block px-4 py-3 text-sm font-medium hover:bg-gray-50 transition-colors pixel-font uppercase">FAVOURITES</a>
+                  <a href="/seen" class="block px-4 py-3 text-sm font-medium hover:bg-gray-50 transition-colors pixel-font uppercase">SEEN</a>
+                  <a href="/map" class="block px-4 py-3 text-sm font-medium hover:bg-gray-50 transition-colors pixel-font uppercase">MAP</a>
+                </div>
+              </div>
+              <button onclick="localStorage.clear(); window.location.href='/';" 
+                      class="pixel__button pixel-destructive__button box-shadow-margin text-sm font-medium px-4 py-2 uppercase">
+                LOGOUT
+              </button>
+            </div>
+          `;
+          
+          // Add fallback dropdown functionality
+          setTimeout(() => {
+            const stashBtn = document.getElementById('stash-btn-fallback');
+            const stashMenu = document.getElementById('stash-menu-fallback');
+            
+            stashBtn?.addEventListener('click', (e) => {
+              e.preventDefault();
+              stashMenu?.classList.toggle('hidden');
+            });
+            
+            document.addEventListener('click', (e) => {
+              if (!stashBtn?.contains(e.target) && !stashMenu?.contains(e.target)) {
+                stashMenu?.classList.add('hidden');
+              }
+            });
+          }, 100);
+        });
+      }
+    } else {
+      notLoggedIn?.classList.remove('hidden');
+      loggedIn?.classList.add('hidden');
+    }
+
+    // Logout handler
+    logoutButton?.addEventListener('click', async () => {
+      try {
+        await logout();
+      } catch (error) {
+        console.error('Logout failed:', error);
+        window.location.href = '/';
+      }
+    });
+
+    // PixelActUI Menubar handles its own dropdown functionality
+
+    // Search functionality
+    const searchContainer = document.getElementById('search-container');
+    const searchInput = document.getElementById('header-search-input');
+    const searchResults = document.getElementById('search-results');
+    const searchLoading = document.getElementById('search-loading');
+    const searchEmpty = document.getElementById('search-empty');
+    const searchItems = document.getElementById('search-items');
+    const searchViewAll = document.getElementById('search-view-all');
+    
+    let searchTimeout;
+    let currentQuery = '';
+
+    const hideResults = () => searchResults?.classList.add('hidden');
+    const showResults = () => searchResults?.classList.remove('hidden');
+
+    const showLoading = () => {
+      searchLoading?.classList.remove('hidden');
+      searchEmpty?.classList.add('hidden');
+      searchItems.innerHTML = '';
+      searchViewAll?.classList.add('hidden');
+    };
+
+    const showEmpty = () => {
+      searchLoading?.classList.add('hidden');
+      searchEmpty?.classList.remove('hidden');
+      searchItems.innerHTML = '';
+      searchViewAll?.classList.add('hidden');
+    };
+
+    // Search input handler
+    searchInput?.addEventListener('input', (e) => {
+      const query = e.target.value.trim();
+      currentQuery = query;
+
+      if (searchTimeout) clearTimeout(searchTimeout);
+      if (query.length === 0) { hideResults(); return; }
+      if (query.length < 2) return;
+
+      searchTimeout = setTimeout(async () => {
+        if (currentQuery !== query) return;
+
+        showLoading();
+        showResults();
+
+        try {
+          const response = await fetch('http://localhost:4003/api/gql', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: `
+                query SearchStrains($query: String!) {
+                  searchStrains(query: $query, page: 1, limit: 5) {
+                    strains {
+                      name
+                      type
+                      rating
+                      image_path
+                    }
+                  }
+                }
+              `,
+              variables: { query }
+            })
+          });
+
+          const data = await response.json();
+          if (currentQuery !== query) return;
+
+          if (data.errors) {
+            console.error('GraphQL errors:', data.errors);
+            showEmpty();
+            return;
+          }
+
+          const strains = data.data?.searchStrains?.strains || [];
+          if (strains.length === 0) { showEmpty(); return; }
+
+          searchLoading?.classList.add('hidden');
+          searchItems.innerHTML = strains.map(strain => `
+            <a href="/strains/${strain.name}" class="block p-3 hover:bg-gray-50 transition-colors">
+              <div class="flex items-center space-x-3">
+                <div class="w-12 h-12 bg-gray-200 rounded-none flex-shrink-0">
+                  <img src="https://cdn.budedex.space/strains/${strain.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}.png" alt="${strain.name}" class="w-full h-full object-cover" onerror="this.src='https://cdn.budedex.space/strains/default.png'">
+                </div>
+                <div class="flex-1 min-w-0">
+                  <h4 class="text-sm font-medium text-gray-900 truncate pixel-font uppercase">${strain.name}</h4>
+                  <p class="text-xs text-gray-500 uppercase pixel-font">${strain.type}</p>
+                  ${strain.rating ? `<p class="text-xs text-yellow-600">★ ${strain.rating.toFixed(1)}</p>` : ''}
+                </div>
+              </div>
+            </a>
+          `).join('');
+
+          searchViewAll?.classList.remove('hidden');
+          const viewAllLink = searchViewAll?.querySelector('a');
+          if (viewAllLink) {
+            viewAllLink.href = `/search?q=${encodeURIComponent(query)}`;
+          }
+        } catch (error) {
+          console.error('Search failed:', error);
+          if (currentQuery === query) showEmpty();
+        }
+      }, 300);
+    });
+
+    // Hide results when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!searchContainer?.contains(e.target)) hideResults();
+    });
+
+    // Search icon animation
+    const searchIcon = document.getElementById('search-icon');
+    const searchIconButton = document.getElementById('search-icon-button');
+    
+    searchIconButton?.addEventListener('click', () => {
+      searchIcon?.style.setProperty('transform', 'scale(0.8)');
+      setTimeout(() => searchIcon?.style.setProperty('transform', 'scale(1)'), 200);
+    });
+
+    // Dynamic search bar sizing - extend from current position to page midpoint
+    function resizeSearchBar() {
+      if (!searchContainer) return;
+      
+      requestAnimationFrame(() => {
+        // Get the page width and calculate midpoint
+        const pageWidth = window.innerWidth;
+        const pageMidpoint = pageWidth / 2;
+        
+        // Get the search container's left position relative to the page
+        const containerRect = searchContainer.getBoundingClientRect();
+        const containerLeft = containerRect.left;
+        
+        // Calculate width from current position to page midpoint, then double it
+        const distanceToMidpoint = pageMidpoint - containerLeft;
+        const doubledWidth = distanceToMidpoint * 2;
+        
+        // Ensure minimum width for usability
+        const finalWidth = Math.max(doubledWidth, 200);
+        
+        searchContainer.style.width = `${finalWidth}px`;
+        searchContainer.style.minWidth = `${finalWidth}px`;
+        searchContainer.style.flexGrow = '0';
+        searchContainer.style.flexShrink = '0';
+        searchContainer.style.boxSizing = 'border-box';
+        searchContainer.style.opacity = '1';
+      });
+    }
+
+    resizeSearchBar();
+    window.addEventListener('resize', resizeSearchBar);
+  });
+</script>
+
+<style>
+  .isolated-green-button {
+    all: unset !important;
+    background-color: #008001 !important;
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.025em !important;
+    box-shadow: 
+      -4px 0px 0px 0px #000000,
+      4px 0px 0px 0px #000000,
+      0px 4px 0px 0px #000000,
+      0px -4px 0px 0px #000000,
+      -4px 0px 0px 0px #0B4B0A inset,
+      0px -4px 0px 0px #0B4B0A inset !important;
+    margin: 4px !important;
+    padding: 7px 16px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    cursor: pointer !important;
+    transition: all 0.1s !important;
+    border: none !important;
+    text-decoration: none !important;
+    position: relative !important;
+  }
+  
+  .isolated-green-button:hover {
+    transform: translateY(1px) !important;
+  }
+</style>

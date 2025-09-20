@@ -1,0 +1,919 @@
+---
+import Layout from '../components/layouts/Layout.astro';
+---
+
+<Layout title="Strain Genealogy Map - Budedx">
+  <div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="text-center mb-8 bg-card p-8 rounded-none">
+      <h1 class="text-4xl font-bold mb-4 pixel-font uppercase tracking-wider">STRAIN GENEALOGY MAP</h1>
+      <p class="text-lg max-w-2xl mx-auto uppercase regular-font">
+        EXPLORE THE FAMILY TREE OF CANNABIS STRAINS. DISCOVER PARENT-CHILD RELATIONSHIPS AND GENETIC LINEAGES.
+      </p>
+    </div>
+
+    <!-- Map Controls -->
+    <div class="bg-card rounded-none p-4 mb-6 flex items-center justify-between">
+      <div class="flex items-center space-x-4">
+        <button id="zoom-in-btn" class="pixel__button pixel-default__button box-shadow-margin text-sm font-medium px-3 py-2 uppercase">
+          ZOOM IN
+        </button>
+        <button id="zoom-out-btn" class="pixel__button pixel-default__button box-shadow-margin text-sm font-medium px-3 py-2 uppercase">
+          ZOOM OUT
+        </button>
+        <button id="reset-view-btn" class="pixel__button pixel-secondary__button box-shadow-margin text-sm font-medium px-3 py-2 uppercase">
+          RESET VIEW
+        </button>
+      </div>
+      <div class="flex items-center space-x-4">
+        <div class="text-sm pixel-font uppercase text-muted-foreground">
+          <span id="strain-count">Loading...</span> STRAINS MAPPED
+        </div>
+        <div class="text-sm pixel-font uppercase text-muted-foreground">
+          <span id="connection-count">0</span> CONNECTIONS
+        </div>
+      </div>
+    </div>
+
+    <!-- Map Container -->
+    <div class="bg-card rounded-none relative overflow-hidden" style="height: 80vh; min-height: 600px;">
+      <canvas 
+        id="strain-map-canvas" 
+        class="w-full h-full cursor-grab active:cursor-grabbing"
+        style="image-rendering: pixelated;"
+      ></canvas>
+      
+      <!-- Left Column Label -->
+      <div id="left-column-label" class="absolute top-4 left-4 text-xs pixel-font uppercase text-muted-foreground opacity-70 pointer-events-none">
+        LANDRACE & UNKNOWN ORIGINS →
+      </div>
+      
+      <!-- Loading Overlay -->
+      <div id="map-loading" class="absolute inset-0 bg-card/90 flex items-center justify-center">
+        <div class="text-center">
+          <div class="text-2xl pixel-font uppercase mb-4">LOADING STRAIN MAP...</div>
+          <div class="flex space-x-1">
+            <div class="w-4 h-8 bg-purple-600 loading-bar" data-delay="0"></div>
+            <div class="w-4 h-8 bg-purple-600 loading-bar" data-delay="100"></div>
+            <div class="w-4 h-8 bg-purple-600 loading-bar" data-delay="200"></div>
+            <div class="w-4 h-8 bg-purple-600 loading-bar" data-delay="300"></div>
+            <div class="w-4 h-8 bg-purple-600 loading-bar" data-delay="400"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Strain Info Popover -->
+      <div id="strain-popover" class="absolute hidden z-50 bg-white border-0 rounded-none p-3 pointer-events-none" style="box-shadow: rgb(0, 0, 0) -4px 0px 0px 0px, rgb(0, 0, 0) 4px 0px 0px 0px, rgb(0, 0, 0) 0px 4px 0px 0px, rgb(0, 0, 0) 0px -4px 0px 0px, rgb(200, 200, 200) -4px 0px 0px 0px inset, rgb(200, 200, 200) 0px -4px 0px 0px inset; margin: 4px;">
+        <div class="text-xs pixel-font uppercase text-center">
+          <div id="popover-name" class="font-bold mb-1"></div>
+          <div id="popover-type" class="text-gray-600 mb-1"></div>
+          <div id="popover-rating" class="text-yellow-600 mb-1"></div>
+          <div id="popover-thc" class="text-green-600"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="bg-card rounded-none p-4 mt-6">
+      <h3 class="text-lg font-bold mb-4 pixel-font uppercase">Legend</h3>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm pixel-font uppercase">
+        <div class="flex items-center space-x-2">
+          <div class="w-4 h-4 bg-green-500 rounded-none border border-black"></div>
+          <span>SATIVA STRAINS</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <div class="w-4 h-4 bg-purple-500 rounded-none border border-black"></div>
+          <span>INDICA STRAINS</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <div class="w-4 h-4 bg-blue-500 rounded-none border border-black"></div>
+          <span>HYBRID STRAINS</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .loading-bar {
+    transition: background-color 0.3s ease;
+  }
+  
+  .loading-bar.active {
+    background-color: #22c55e; /* green-500 */
+  }
+  
+  #strain-map-canvas {
+    background: linear-gradient(45deg, #f8f9fa 25%, transparent 25%), 
+                linear-gradient(-45deg, #f8f9fa 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #f8f9fa 75%), 
+                linear-gradient(-45deg, transparent 75%, #f8f9fa 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  }
+</style>
+
+<script>
+  // Map state
+  let canvas, ctx;
+  let strains = [];
+  let connections = [];
+  let camera = { x: 0, y: 0, zoom: 0.5 }; // Start zoomed out to see more
+  let isDragging = false;
+  let lastMousePos = { x: 0, y: 0 };
+  let hoveredStrain = null;
+  let hoverThrottle = null;
+
+  // Node styling
+  const NODE_SIZE = 60;
+  const NODE_SPACING = 120;
+  const COLORS = {
+    'Sativa': '#22c55e',      // green-500
+    'Indica': '#a855f7',      // purple-500  
+    'Hybrid': '#3b82f6',      // blue-500
+    'Unknown': '#6b7280'      // gray-500
+  };
+
+  document.addEventListener('DOMContentLoaded', async () => {
+    await initializeMap();
+  });
+
+  async function initializeMap() {
+    canvas = document.getElementById('strain-map-canvas');
+    ctx = canvas.getContext('2d');
+    
+    // Set canvas size
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+    
+    // Setup event listeners
+    setupCanvasEvents();
+    setupControlEvents();
+    
+    // Start loading animation
+    startLoadingAnimation();
+    
+    // Load strain data
+    await loadStrainData();
+    
+    // Hide loading overlay
+    document.getElementById('map-loading').style.display = 'none';
+    
+    // Initial render
+    render();
+  }
+
+  function resizeCanvas() {
+    const container = canvas.parentElement;
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
+    if (strains.length > 0) render();
+  }
+
+  function setupCanvasEvents() {
+    // Mouse events for panning
+    canvas.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      lastMousePos = { x: e.clientX, y: e.clientY };
+      canvas.style.cursor = 'grabbing';
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (isDragging) {
+        const deltaX = e.clientX - lastMousePos.x;
+        const deltaY = e.clientY - lastMousePos.y;
+        
+        camera.x += deltaX;
+        camera.y += deltaY;
+        
+        lastMousePos = { x: e.clientX, y: e.clientY };
+        render();
+        } else {
+          // Throttle hover events to prevent excessive re-renders
+          if (hoverThrottle) clearTimeout(hoverThrottle);
+          
+          hoverThrottle = setTimeout(() => {
+            const mousePos = getMousePos(e);
+            const hoveredNode = getStrainAtPosition(mousePos.x, mousePos.y);
+            
+            if (hoveredNode !== hoveredStrain) {
+              hoveredStrain = hoveredNode;
+              showStrainPopover(e, hoveredNode);
+              render(); // Re-render to update highlighting
+            }
+          }, 50); // 50ms throttle
+        }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      isDragging = false;
+      canvas.style.cursor = 'grab';
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+      isDragging = false;
+      canvas.style.cursor = 'grab';
+      hideStrainPopover();
+    });
+
+    // Zoom with mouse wheel
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+      camera.zoom = Math.max(0.1, Math.min(3, camera.zoom * zoomFactor));
+      render();
+    });
+  }
+
+  function setupControlEvents() {
+    document.getElementById('zoom-in-btn')?.addEventListener('click', () => {
+      camera.zoom = Math.min(3, camera.zoom * 1.2);
+      render();
+    });
+
+    document.getElementById('zoom-out-btn')?.addEventListener('click', () => {
+      camera.zoom = Math.max(0.1, camera.zoom * 0.8);
+      render();
+    });
+
+    document.getElementById('reset-view-btn')?.addEventListener('click', () => {
+      camera = { x: 0, y: 0, zoom: 1 };
+      render();
+    });
+  }
+
+  function startLoadingAnimation() {
+    const loadingBars = document.querySelectorAll('.loading-bar');
+    loadingBars.forEach((bar, index) => {
+      const delay = parseInt(bar.getAttribute('data-delay') || '0');
+      setTimeout(() => {
+        bar.classList.add('active');
+      }, delay);
+    });
+  }
+
+  async function loadStrainData() {
+    try {
+      console.log('Starting to fetch strain data from GraphQL...');
+      
+      // First, get the total count to know how many pages we need
+      const firstResponse = await fetch('http://localhost:4003/api/gql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `
+            query GetStrainCount {
+              strains(page: 1, limit: 1) {
+                pageInfo {
+                  total
+                }
+              }
+            }
+          `
+        })
+      });
+
+      const firstData = await firstResponse.json();
+      const totalStrains = firstData.data?.strains?.pageInfo?.total || 0;
+      const limit = 100;
+      const totalPages = Math.ceil(totalStrains / limit);
+      
+      console.log(`Total strains: ${totalStrains}, Pages needed: ${totalPages}`);
+      
+      // Create array of all page numbers to fetch
+      const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
+      
+      // Fetch pages in chunks with increased backend rate limit
+      const chunkSize = 3; // Moderate chunk size for good performance
+      let allStrains = [];
+      
+      for (let i = 0; i < pageNumbers.length; i += chunkSize) {
+        const chunk = pageNumbers.slice(i, i + chunkSize);
+        console.log(`Fetching pages ${chunk[0]}-${chunk[chunk.length - 1]} in parallel...`);
+        
+        const promises = chunk.map(page => 
+          fetch('http://localhost:4003/api/gql', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: `
+                query GetAllStrainsForMap($page: Int!, $limit: Int!) {
+                  strains(page: $page, limit: $limit) {
+                    strains {
+                      name
+                      type
+                      rating
+                      thc
+                      parents
+                      children
+                    }
+                  }
+                }
+              `,
+              variables: { page, limit }
+            })
+          }).then(response => response.json())
+        );
+        
+        const results = await Promise.all(promises);
+        
+        // Process results
+        for (const data of results) {
+          console.log('GraphQL response for chunk:', data);
+          if (data.errors) {
+            console.error('GraphQL errors:', data.errors);
+            continue;
+          }
+          
+          const pageStrains = data.data?.strains?.strains || [];
+          console.log(`Page returned ${pageStrains.length} strains`);
+          allStrains = allStrains.concat(pageStrains);
+        }
+        
+        console.log(`Processed chunk. Total strains so far: ${allStrains.length}`);
+        
+        // Add delay between chunks to avoid rate limiting
+        if (i + chunkSize < pageNumbers.length) {
+          await new Promise(resolve => setTimeout(resolve, 200)); // 200ms delay
+        }
+      }
+      
+      console.log(`Fetched ${allStrains.length} total strains in parallel`);
+      
+      // Keep ALL strains - we'll position them differently
+      strains = allStrains;
+      
+      // Separate strains with and without genetics data
+      const strainsWithGenetics = strains.filter(strain => strain.parents || strain.children);
+      const strainsWithoutGenetics = strains.filter(strain => !strain.parents && !strain.children);
+      
+      console.log(`Total strains: ${strains.length}`);
+      console.log(`With genetics: ${strainsWithGenetics.length}, Without genetics: ${strainsWithoutGenetics.length}`);
+      
+      // Create connections (checking both names and aliases)
+      connections = [];
+      strains.forEach(strain => {
+        if (strain.parents) {
+          strain.parents.split(', ').forEach(parentName => {
+            const parentStrain = findStrainByNameOrAlias(parentName.trim(), strains);
+            if (parentStrain) {
+              connections.push({
+                from: parentStrain,
+                to: strain,
+                type: 'parent-child'
+              });
+            }
+          });
+        }
+      });
+      
+      console.log(`Created ${connections.length} connections between strains`);
+
+      // Position strains using force-directed layout
+      positionStrains();
+      
+      // Update UI
+      document.getElementById('strain-count').textContent = strains.length;
+      document.getElementById('connection-count').textContent = connections.length;
+      
+    } catch (error) {
+      console.error('Failed to load strain data:', error);
+      document.getElementById('map-loading').innerHTML = '<div class="text-center text-red-600 pixel-font uppercase">FAILED TO LOAD MAP DATA</div>';
+    }
+  }
+
+  function positionStrains() {
+    console.log('Positioning strains in optimized hierarchical tree layout...');
+    
+    // Create a map for quick strain lookup
+    const strainMap = new Map();
+    strains.forEach(strain => strainMap.set(strain.name, strain));
+    
+    // Find true root strains (strains with no parents in our dataset)
+    const rootStrains = strains.filter(strain => {
+      if (!strain.parents) return true;
+      const parentNames = strain.parents.split(', ').map(p => p.trim());
+      return !parentNames.some(parentName => findStrainByNameOrAlias(parentName, strains));
+    });
+    
+    console.log(`Found ${rootStrains.length} root strains`);
+    
+    // Limit root strains to prevent overcrowding
+    const maxRootsPerRow = 8;
+    const rootRows = Math.ceil(rootStrains.length / maxRootsPerRow);
+    
+    // Build family trees for each root strain
+    const familyTrees = [];
+    const positioned = new Set();
+    
+    rootStrains.forEach((root, rootIndex) => {
+      if (!positioned.has(root.name)) {
+        const tree = buildFamilyTree(root, strainMap, positioned);
+        familyTrees.push(tree);
+      }
+    });
+    
+    // Position family trees in a grid layout
+    const treesPerRow = Math.min(4, Math.ceil(Math.sqrt(familyTrees.length)));
+    const treeSpacing = 800; // Space between tree centers
+    
+    familyTrees.forEach((tree, treeIndex) => {
+      const treeRow = Math.floor(treeIndex / treesPerRow);
+      const treeCol = treeIndex % treesPerRow;
+      
+      const treeOffsetX = (treeCol - (treesPerRow - 1) / 2) * treeSpacing;
+      const treeOffsetY = treeRow * treeSpacing;
+      
+      positionFamilyTree(tree, treeOffsetX, treeOffsetY);
+    });
+    
+    // Handle remaining unpositioned strains
+    const unpositioned = strains.filter(strain => !positioned.has(strain.name));
+    if (unpositioned.length > 0) {
+      console.log(`Positioning ${unpositioned.length} unconnected strains on the left side`);
+      
+      
+      // Position strains without genetics in a vertical column on the left
+      const leftColumnX = -1200; // Far left position
+      const verticalSpacing = NODE_SIZE + 20; // Ensure no overlap with extra spacing
+      const startY = 100;
+      
+      unpositioned.forEach((strain, index) => {
+        strain.x = leftColumnX;
+        strain.y = startY + (index * verticalSpacing);
+        strain.level = 1000; // Mark as unconnected
+        positioned.add(strain.name);
+        
+      });
+    }
+    
+    console.log(`Positioned ${positioned.size} strains in ${familyTrees.length} family trees`);
+    
+    // Debug: Log some strain positions
+    console.log('Sample strain positions:');
+    strains.slice(0, 5).forEach(strain => {
+      console.log(`${strain.name}: (${strain.x}, ${strain.y}), level: ${strain.level}`);
+    });
+  }
+
+  function buildFamilyTree(root, strainMap, positioned, maxDepth = 6) {
+    const tree = { root, levels: [] };
+    const queue = [{ strain: root, level: 0 }];
+    const visited = new Set();
+    
+    while (queue.length > 0 && tree.levels.length < maxDepth) {
+      const { strain, level } = queue.shift();
+      
+      if (visited.has(strain.name)) continue;
+      visited.add(strain.name);
+      positioned.add(strain.name);
+      
+      
+      if (!tree.levels[level]) tree.levels[level] = [];
+      tree.levels[level].push(strain);
+      
+      // Add children to next level
+      if (strain.children) {
+        strain.children.split(', ').forEach(childName => {
+          const childStrain = findStrainByNameOrAlias(childName.trim(), strains);
+          if (childStrain && !visited.has(childStrain.name)) {
+            queue.push({ strain: childStrain, level: level + 1 });
+          }
+        });
+      }
+    }
+    
+    return tree;
+  }
+
+  function positionFamilyTree(tree, offsetX, offsetY) {
+    const LEVEL_HEIGHT = NODE_SPACING * 1.8;
+    const startY = 100 + offsetY;
+    
+    tree.levels.forEach((level, levelIndex) => {
+      const y = startY + (levelIndex * LEVEL_HEIGHT);
+      
+      // Limit width to prevent extreme spreading
+      const maxWidth = Math.min(600, level.length * NODE_SPACING * 1.5);
+      const spacing = level.length > 1 ? maxWidth / (level.length - 1) : 0;
+      const startX = offsetX - maxWidth / 2;
+      
+      level.forEach((strain, strainIndex) => {
+        if (level.length === 1) {
+          strain.x = offsetX;
+        } else {
+          strain.x = startX + (strainIndex * spacing);
+        }
+        strain.y = y;
+        strain.level = levelIndex;
+      });
+    });
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    ctx.save();
+    ctx.translate(camera.x + canvas.width / 2, camera.y + canvas.height / 2);
+    ctx.scale(camera.zoom, camera.zoom);
+    
+    // Temporarily disable viewport culling for debugging
+    const visibleStrains = strains;
+    const visibleConnections = connections;
+    
+    // Draw connections first (behind nodes)
+    drawConnections(visibleConnections);
+    
+    // Draw strain nodes with level of detail
+    drawStrains(visibleStrains);
+    
+    ctx.restore();
+    
+    // Update performance stats
+    updatePerformanceStats(visibleStrains.length, visibleConnections.length);
+  }
+
+  function getViewportBounds() {
+    const margin = 100; // Extra margin for smooth scrolling
+    const scale = 1 / camera.zoom;
+    const centerX = -camera.x * scale;
+    const centerY = -camera.y * scale;
+    const halfWidth = (canvas.width / 2) * scale;
+    const halfHeight = (canvas.height / 2) * scale;
+    
+    return {
+      left: centerX - halfWidth - margin,
+      right: centerX + halfWidth + margin,
+      top: centerY - halfHeight - margin,
+      bottom: centerY + halfHeight + margin
+    };
+  }
+
+  function getVisibleStrains(bounds) {
+    return strains.filter(strain => 
+      strain.x >= bounds.left && strain.x <= bounds.right &&
+      strain.y >= bounds.top && strain.y <= bounds.bottom
+    );
+  }
+
+  function getVisibleConnections(bounds, visibleStrains) {
+    const visibleStrainNames = new Set(visibleStrains.map(s => s.name));
+    
+    return connections.filter(connection => {
+      const from = connection.from;
+      const to = connection.to;
+      
+      // Include connection if either endpoint is visible or line crosses viewport
+      return visibleStrainNames.has(from.name) || 
+             visibleStrainNames.has(to.name) ||
+             lineIntersectsViewport(from, to, bounds);
+    });
+  }
+
+  function lineIntersectsViewport(from, to, bounds) {
+    // Simple line-rectangle intersection test
+    return !(
+      (from.x < bounds.left && to.x < bounds.left) ||
+      (from.x > bounds.right && to.x > bounds.right) ||
+      (from.y < bounds.top && to.y < bounds.top) ||
+      (from.y > bounds.bottom && to.y > bounds.bottom)
+    );
+  }
+
+  function updatePerformanceStats(visibleStrains, visibleConnections) {
+    // Occasional performance logging
+    if (Math.random() < 0.05) { // 5% chance
+      console.log(`Rendering: ${visibleStrains}/${strains.length} strains, ${visibleConnections}/${connections.length} connections`);
+    }
+  }
+
+  function findStrainByNameOrAlias(searchName, strainList) {
+    // First try exact name match
+    let found = strainList.find(s => s.name === searchName);
+    if (found) return found;
+    
+    // Then try case-insensitive name match
+    found = strainList.find(s => s.name.toLowerCase() === searchName.toLowerCase());
+    if (found) return found;
+    
+    // Skip alias checking for now since aliases field might not exist
+    // TODO: Re-enable once aliases field is confirmed in GraphQL schema
+    
+    return found || null;
+  }
+
+  function getLevelOfDetail() {
+    if (camera.zoom >= 1.0) {
+      return {
+        nodeSize: NODE_SIZE,
+        showText: true,
+        showStars: true,
+        showBorders: true,
+        showFamilyHighlighting: true,
+        fontSize: 8
+      };
+    } else if (camera.zoom >= 0.5) {
+      return {
+        nodeSize: NODE_SIZE * 0.8,
+        showText: true,
+        showStars: false,
+        showBorders: true,
+        showFamilyHighlighting: true,
+        fontSize: 6
+      };
+    } else if (camera.zoom >= 0.3) {
+      return {
+        nodeSize: NODE_SIZE * 0.6,
+        showText: false,
+        showStars: false,
+        showBorders: false,
+        showFamilyHighlighting: false,
+        fontSize: 0
+      };
+    } else {
+      return {
+        nodeSize: NODE_SIZE * 0.4,
+        showText: false,
+        showStars: false,
+        showBorders: false,
+        showFamilyHighlighting: false,
+        fontSize: 0
+      };
+    }
+  }
+
+  function drawConnections(connectionsToRender = connections) {
+    ctx.lineWidth = 2;
+    ctx.setLineDash([]); // Solid lines for cleaner tree branches
+    
+    // Skip connection rendering if zoomed out too far for performance
+    if (camera.zoom < 0.3) {
+      return;
+    }
+    
+    // Get family members once if a strain is hovered (cached)
+    let familyMembers = new Set();
+    if (hoveredStrain) {
+      try {
+        addFamilyMembers(hoveredStrain, familyMembers);
+      } catch (error) {
+        console.warn('Error calculating family members:', error);
+        familyMembers = new Set([hoveredStrain.name]); // Fallback to just the hovered strain
+      }
+    }
+    
+    connectionsToRender.forEach(connection => {
+      const from = connection.from;
+      const to = connection.to;
+      
+      // Check if this connection is part of hovered strain's family
+      const isHighlighted = hoveredStrain && (
+        familyMembers.has(from.name) || familyMembers.has(to.name)
+      );
+      
+      // Use different colors and styles
+      const levelDiff = (to.level || 0) - (from.level || 0);
+      if (isHighlighted) {
+        ctx.strokeStyle = '#dc2626'; // red-600 for highlighted family connections
+        ctx.lineWidth = 4;
+      } else if (levelDiff === 1) {
+        ctx.strokeStyle = '#059669'; // emerald-600 for direct parent-child
+        ctx.lineWidth = 2;
+      } else {
+        ctx.strokeStyle = '#6b7280'; // gray-500 for other connections
+        ctx.lineWidth = 2;
+      }
+      
+      // Draw tree-style connection (vertical then horizontal)
+      ctx.beginPath();
+      
+      // Start from parent
+      ctx.moveTo(from.x, from.y + NODE_SIZE / 2);
+      
+      // Go down to midpoint
+      const midY = from.y + (to.y - from.y) * 0.7;
+      ctx.lineTo(from.x, midY);
+      
+      // Go horizontally to child x position
+      ctx.lineTo(to.x, midY);
+      
+      // Go down to child
+      ctx.lineTo(to.x, to.y - NODE_SIZE / 2);
+      
+      ctx.stroke();
+      
+      // Draw arrow head pointing to child
+      ctx.fillStyle = ctx.strokeStyle;
+      ctx.beginPath();
+      ctx.moveTo(to.x, to.y - NODE_SIZE / 2);
+      const arrowSize = isHighlighted ? 8 : 6;
+      ctx.lineTo(to.x - arrowSize, to.y - NODE_SIZE / 2 - (arrowSize + 2));
+      ctx.lineTo(to.x + arrowSize, to.y - NODE_SIZE / 2 - (arrowSize + 2));
+      ctx.closePath();
+      ctx.fill();
+    });
+  }
+
+  // Cache family lookups to avoid repeated calculations
+  const familyCache = new Map();
+  
+  function addFamilyMembers(strain, familyMembers, depth = 0, maxDepth = 3) {
+    // Prevent infinite recursion and limit family tree depth
+    if (familyMembers.has(strain.name) || depth > maxDepth) return;
+    
+    // Check cache first
+    const cacheKey = strain.name;
+    if (familyCache.has(cacheKey)) {
+      const cachedFamily = familyCache.get(cacheKey);
+      cachedFamily.forEach(name => familyMembers.add(name));
+      return;
+    }
+    
+    familyMembers.add(strain.name);
+    
+    // Limit the number of family members to prevent crashes
+    if (familyMembers.size > 50) {
+      console.warn('Family tree too large, truncating at 50 members');
+      return;
+    }
+    
+    // Add parents (limited depth)
+    if (strain.parents && depth < maxDepth) {
+      const parentNames = strain.parents.split(', ').slice(0, 5); // Limit parents
+      parentNames.forEach(parentName => {
+        const parent = findStrainByNameOrAlias(parentName.trim(), strains);
+        if (parent) {
+          addFamilyMembers(parent, familyMembers, depth + 1, maxDepth);
+        }
+      });
+    }
+    
+    // Add children (limited depth and count)
+    if (strain.children && depth < maxDepth) {
+      const childNames = strain.children.split(', ').slice(0, 10); // Limit children
+      childNames.forEach(childName => {
+        const child = findStrainByNameOrAlias(childName.trim(), strains);
+        if (child) {
+          addFamilyMembers(child, familyMembers, depth + 1, maxDepth);
+        }
+      });
+    }
+  }
+
+  function drawStrains(strainsToRender = strains) {
+    // Calculate family members once for all strain nodes
+    let familyMembers = new Set();
+    if (hoveredStrain) {
+      try {
+        addFamilyMembers(hoveredStrain, familyMembers);
+      } catch (error) {
+        console.warn('Error calculating family members for strain rendering:', error);
+        familyMembers = new Set([hoveredStrain.name]);
+      }
+    }
+    
+    strainsToRender.forEach(strain => {
+      drawStrainNode(strain, familyMembers);
+    });
+  }
+
+  function drawStrainNode(strain, preCalculatedFamilyMembers = new Set()) {
+    // Level of Detail based on zoom level
+    const lod = getLevelOfDetail();
+    
+    const nodeSize = lod.nodeSize;
+    const x = strain.x - nodeSize / 2;
+    const y = strain.y - nodeSize / 2;
+    const isHovered = strain === hoveredStrain;
+    
+    // Use pre-calculated family members for performance
+    const isInFamily = hoveredStrain && lod.showFamilyHighlighting && 
+                      preCalculatedFamilyMembers.has(strain.name) && strain !== hoveredStrain;
+    
+    // Get strain color based on type
+    const color = COLORS[strain.type] || COLORS['Unknown'];
+    
+    // Simplified rendering for distant zoom levels
+    if (camera.zoom < 0.3) {
+      // Just draw a simple colored dot
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, nodeSize, nodeSize);
+      return;
+    }
+    
+    // Draw outer border (if LOD allows)
+    if (lod.showBorders) {
+      let borderSize = isHovered ? 3 : 2;
+      let borderColor = '#000000';
+      
+      if (isInFamily) {
+        borderSize = 3;
+        borderColor = '#dc2626'; // red-600 for family members
+      }
+      
+      ctx.fillStyle = borderColor;
+      ctx.fillRect(x - borderSize, y - borderSize, nodeSize + (borderSize * 2), nodeSize + (borderSize * 2));
+      
+      // Draw main node (brighter if hovered or in family)
+      let nodeColor = color;
+      if (isHovered) {
+        nodeColor = lightenColor(color, 20);
+      } else if (isInFamily) {
+        nodeColor = lightenColor(color, 10);
+      }
+      ctx.fillStyle = nodeColor;
+      ctx.fillRect(x, y, nodeSize, nodeSize);
+      
+      // Draw inner border (lighter)
+      const innerOpacity = isHovered ? 0.5 : (isInFamily ? 0.4 : 0.3);
+      ctx.fillStyle = `rgba(255, 255, 255, ${innerOpacity})`;
+      ctx.fillRect(x + 2, y + 2, nodeSize - 4, 2); // Top
+      ctx.fillRect(x + 2, y + 2, 2, nodeSize - 4); // Left
+      
+      // Draw darker inner border (bottom/right)
+      const darkOpacity = isHovered ? 0.4 : (isInFamily ? 0.35 : 0.3);
+      ctx.fillStyle = `rgba(0, 0, 0, ${darkOpacity})`;
+      ctx.fillRect(x + 2, y + nodeSize - 4, nodeSize - 4, 2); // Bottom
+      ctx.fillRect(x + nodeSize - 4, y + 2, 2, nodeSize - 4); // Right
+    } else {
+      // Simple colored rectangle for medium zoom
+      ctx.fillStyle = isHovered ? lightenColor(color, 20) : color;
+      ctx.fillRect(x, y, nodeSize, nodeSize);
+    }
+    
+    // Draw strain name (if LOD allows)
+    if (lod.showText && lod.fontSize > 0) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = isHovered ? `bold ${lod.fontSize}px monospace` : `${lod.fontSize}px monospace`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      const maxChars = Math.floor(nodeSize / (lod.fontSize * 0.6));
+      const shortName = strain.name.length > maxChars ? strain.name.substring(0, maxChars) + '...' : strain.name;
+      ctx.fillText(shortName.toUpperCase(), strain.x, strain.y);
+    }
+    
+    // Draw rating stars (if LOD allows)
+    if (lod.showStars && strain.rating) {
+      const stars = Math.round(strain.rating);
+      ctx.fillStyle = isHovered ? '#fde047' : '#fbbf24'; // brighter yellow if hovered
+      const starSize = Math.max(2, Math.floor(nodeSize / 15));
+      for (let i = 0; i < Math.min(stars, 5); i++) {
+        const starX = x + 4 + (i * (starSize + 2));
+        const starY = y + nodeSize - starSize - 4;
+        ctx.fillRect(starX, starY, starSize, starSize); // Simple pixel star
+      }
+    }
+  }
+
+  function lightenColor(color, percent) {
+    // Simple color lightening function
+    const num = parseInt(color.replace("#", ""), 16);
+    const amt = Math.round(2.55 * percent);
+    const R = (num >> 16) + amt;
+    const G = (num >> 8 & 0x00FF) + amt;
+    const B = (num & 0x0000FF) + amt;
+    return "#" + (0x1000000 + (R < 255 ? R < 1 ? 0 : R : 255) * 0x10000 +
+      (G < 255 ? G < 1 ? 0 : G : 255) * 0x100 +
+      (B < 255 ? B < 1 ? 0 : B : 255)).toString(16).slice(1);
+  }
+
+  function getMousePos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left - canvas.width / 2 - camera.x) / camera.zoom,
+      y: (e.clientY - rect.top - canvas.height / 2 - camera.y) / camera.zoom
+    };
+  }
+
+  function getStrainAtPosition(x, y) {
+    return strains.find(strain => {
+      const dx = x - strain.x;
+      const dy = y - strain.y;
+      return Math.abs(dx) < NODE_SIZE / 2 && Math.abs(dy) < NODE_SIZE / 2;
+    });
+  }
+
+  function showStrainPopover(e, strain) {
+    const popover = document.getElementById('strain-popover');
+    if (!strain) {
+      hideStrainPopover();
+      return;
+    }
+    
+    // Update popover content
+    document.getElementById('popover-name').textContent = strain.name;
+    document.getElementById('popover-type').textContent = strain.type || 'Unknown';
+    document.getElementById('popover-rating').textContent = strain.rating ? `★ ${strain.rating.toFixed(1)}` : '';
+    document.getElementById('popover-thc').textContent = strain.thc || '';
+    
+    // Position popover
+    popover.style.left = `${e.clientX + 10}px`;
+    popover.style.top = `${e.clientY - 10}px`;
+    popover.classList.remove('hidden');
+  }
+
+  function hideStrainPopover() {
+    document.getElementById('strain-popover').classList.add('hidden');
+  }
+</script>

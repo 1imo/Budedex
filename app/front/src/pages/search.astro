@@ -1,0 +1,156 @@
+---
+import Layout from '../components/layouts/Layout.astro';
+import { searchStrains } from '../services/graphql';
+import PixelStrainCard from '../components/PixelStrainCard.astro';
+
+// Get search query from URL params
+const url = new URL(Astro.request.url);
+const query = url.searchParams.get('q') || '';
+const page = parseInt(url.searchParams.get('page') || '1');
+const limit = 24;
+
+// Perform search if query exists
+let searchResults = null;
+let error = null;
+
+if (query.trim()) {
+  try {
+    searchResults = await searchStrains(query, page, limit);
+  } catch (e) {
+    error = e instanceof Error ? e.message : 'Search failed';
+  }
+}
+---
+
+<Layout title={query ? `Search: ${query} - Budedex` : 'Search - Budedex'}>
+  <div class="container mx-auto px-4 py-8">
+    <!-- Search Header -->
+    <div class="text-center mb-12 bg-card p-8 rounded-none">
+      <h1 class="text-4xl font-bold mb-4 pixel-font uppercase tracking-wider">SEARCH STRAINS</h1>
+      <p class="text-xl max-w-2xl mx-auto uppercase regular-font mb-6">
+        FIND STRAINS BY NAME, EFFECTS, FLAVORS, TERPENES, AND MORE
+      </p>
+      
+      <!-- Search Form -->
+      <form method="GET" action="/search" class="max-w-md mx-auto">
+        <div class="relative">
+          <input 
+            type="text" 
+            name="q"
+            value={query}
+            placeholder="SEARCH STRAINS..." 
+            class="pixel__button bg-white border-2 border-black rounded-none px-4 py-3 text-sm regular-font uppercase w-full placeholder:text-muted-foreground"
+            autofocus
+          />
+          <button 
+            type="submit"
+            class="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-primary"
+          >
+            <svg width="20" height="20" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="6" cy="6" r="3"/>
+              <path d="m11 11 3 3"/>
+            </svg>
+          </button>
+        </div>
+      </form>
+    </div>
+
+    {error && (
+      <div class="pixel__container bg-destructive text-destructive-foreground px-4 py-3 rounded-none mb-6 box-shadow-margin">
+        <p class="pixel-font uppercase">ERROR: {error}</p>
+      </div>
+    )}
+
+    {query.trim() && !searchResults && !error && (
+      <div class="text-center py-12">
+        <p class="text-xl pixel-font uppercase">ENTER A SEARCH TERM TO FIND STRAINS</p>
+      </div>
+    )}
+
+    {searchResults && (
+      <div>
+        <!-- Search Results Header -->
+        <div class="bg-muted rounded-none p-4 mb-8">
+          <div class="flex justify-between items-center flex-wrap gap-4">
+            <div class="text-sm pixel-font uppercase">
+              SEARCH RESULTS FOR "{query}"
+            </div>
+            <div class="text-sm font-bold pixel-font uppercase text-primary">
+              {searchResults.searchStrains?.pageInfo?.total || 0} RESULTS FOUND
+            </div>
+          </div>
+        </div>
+
+        <!-- Results Grid -->
+        {searchResults.searchStrains?.strains?.length > 0 ? (
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-12">
+            {searchResults.searchStrains.strains.map((strain: any) => (
+              <PixelStrainCard strain={strain} />
+            ))}
+          </div>
+        ) : (
+          <div class="text-center py-12">
+            <p class="text-xl pixel-font uppercase mb-4">NO STRAINS FOUND</p>
+            <p class="regular-font">Try searching for different terms like strain names, effects, or flavors.</p>
+          </div>
+        )}
+
+        <!-- Pagination -->
+        {searchResults.searchStrains?.pageInfo?.totalPages > 1 && (
+          <div class="bg-muted rounded-none p-4">
+            <div class="flex justify-center items-center space-x-4 flex-wrap gap-4">
+              {searchResults.searchStrains.pageInfo.hasPreviousPage && (
+                <a 
+                  href={`/search?q=${encodeURIComponent(query)}&page=${page - 1}`} 
+                  class="pixel__button pixel-secondary__button box-shadow-margin text-sm font-medium px-4 py-2 uppercase"
+                >
+                  PREVIOUS
+                </a>
+              )}
+              
+              <div class="bg-card p-2 rounded-none">
+                <span class="text-sm font-bold pixel-font uppercase text-primary">
+                  PAGE {page} OF {searchResults.searchStrains.pageInfo.totalPages}
+                </span>
+              </div>
+              
+              {searchResults.searchStrains.pageInfo.hasNextPage && (
+                <a 
+                  href={`/search?q=${encodeURIComponent(query)}&page=${page + 1}`}
+                  class="pixel__button pixel-secondary__button box-shadow-margin text-sm font-medium px-4 py-2 uppercase"
+                >
+                  NEXT
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+</Layout>
+
+<script>
+  // Add search functionality to header search input
+  document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('search-input');
+    const searchButton = document.getElementById('search-button');
+    
+    if (searchInput && searchButton) {
+      const performSearch = () => {
+        const query = (searchInput as HTMLInputElement).value.trim();
+        if (query) {
+          window.location.href = `/search?q=${encodeURIComponent(query)}`;
+        }
+      };
+
+      searchButton.addEventListener('click', performSearch);
+      searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          performSearch();
+        }
+      });
+    }
+  });
+</script>

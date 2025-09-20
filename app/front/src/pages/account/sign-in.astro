@@ -1,0 +1,28 @@
+---
+import Layout from '../../components/layouts/Layout.astro';
+import SignInForm from '../../components/SignInForm';
+---
+
+<Layout title="Sign In - Budedex">
+  <div class="container mx-auto py-8">
+    <div class="max-w-md mx-auto">
+      <div class="text-center mb-8">
+        <h1 class="text-3xl pixel-font uppercase tracking-tight mb-2">Welcome Back</h1>
+        <p class="regular-font text-muted-foreground">Sign in to your account to continue</p>
+      </div>
+      
+      <div class="bg-white">
+        <SignInForm client:load />
+      </div>
+      
+      <div class="text-center mt-6">
+        <p class="text-sm regular-font text-muted-foreground">
+          Don't have an account? 
+          <a href="/account/sign-up" class="font-medium text-primary hover:underline regular-font">
+            Sign up
+          </a>
+        </p>
+      </div>
+    </div>
+  </div>
+</Layout>

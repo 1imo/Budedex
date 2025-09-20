@@ -1,0 +1,98 @@
+---
+// PixelActUI Loading Screen Component
+---
+
+<div id="pixel-loading-screen" class="fixed inset-0 z-[9999] bg-purple-600 flex items-end justify-start p-8 transition-opacity duration-500">
+  <div class="flex flex-col items-start space-y-4">
+    <!-- Loading Text -->
+    <div class="text-white pixel-font text-2xl uppercase tracking-wider">
+      LOADING
+    </div>
+    
+    <!-- Staggered Green Loading Bars -->
+    <div class="flex space-x-1">
+      <div class="w-4 h-8 bg-white loading-bar" data-delay="0"></div>
+      <div class="w-4 h-8 bg-white loading-bar" data-delay="100"></div>
+      <div class="w-4 h-8 bg-white loading-bar" data-delay="200"></div>
+      <div class="w-4 h-8 bg-white loading-bar" data-delay="300"></div>
+      <div class="w-4 h-8 bg-white loading-bar" data-delay="400"></div>
+      <div class="w-4 h-8 bg-white loading-bar" data-delay="500"></div>
+      <div class="w-4 h-8 bg-white loading-bar" data-delay="600"></div>
+      <div class="w-4 h-8 bg-white loading-bar" data-delay="700"></div>
+      <div class="w-4 h-8 bg-white loading-bar" data-delay="800"></div>
+      <div class="w-4 h-8 bg-white loading-bar" data-delay="900"></div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .loading-bar {
+    transition: background-color 0.3s ease;
+  }
+  
+  .loading-bar.active {
+    background-color: #22c55e; /* green-500 */
+  }
+  
+  #pixel-loading-screen.fade-out {
+    opacity: 0;
+    pointer-events: none;
+  }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const loadingScreen = document.getElementById('pixel-loading-screen');
+    const loadingBars = document.querySelectorAll('.loading-bar');
+    
+    // Start the staggered loading animation
+    const startLoadingAnimation = () => {
+      loadingBars.forEach((bar, index) => {
+        const delay = parseInt(bar.getAttribute('data-delay') || '0');
+        setTimeout(() => {
+          bar.classList.add('active');
+        }, delay);
+      });
+    };
+    
+    // Hide the loading screen
+    const hideLoadingScreen = () => {
+      if (loadingScreen) {
+        loadingScreen.classList.add('fade-out');
+        setTimeout(() => {
+          loadingScreen.style.display = 'none';
+        }, 500); // Wait for fade transition
+      }
+    };
+    
+    // Start animation immediately
+    startLoadingAnimation();
+    
+    let pageLoaded = false;
+    let minTimeReached = false;
+    
+    // Check if we can hide (both conditions met)
+    const checkAndHide = () => {
+      if (pageLoaded && minTimeReached) {
+        hideLoadingScreen();
+      }
+    };
+    
+    // Minimum 0.5 second timer
+    setTimeout(() => {
+      minTimeReached = true;
+      checkAndHide();
+    }, 500);
+    
+    // Wait for page load (if longer than 1s)
+    window.addEventListener('load', () => {
+      pageLoaded = true;
+      checkAndHide();
+    });
+    
+    // Fallback: if page is already loaded
+    if (document.readyState === 'complete') {
+      pageLoaded = true;
+    }
+  });
+</script>
