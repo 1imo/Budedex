@@ -174,12 +174,12 @@ export class UserService {
         }
     }
 
-  // Favourites methods (with legacy method names for compatibility)
-  async addToFavourites(username: string, favouriteData: FavouriteAction): Promise<any> {
-    return this.addFavourite(username, favouriteData);
-  }
+    // Favourites methods (with legacy method names for compatibility)
+    async addToFavourites(username: string, favouriteData: FavouriteAction): Promise<any> {
+        return this.addFavourite(username, favouriteData);
+    }
 
-  async addFavourite(username: string, favouriteData: FavouriteAction): Promise<any> {
+    async addFavourite(username: string, favouriteData: FavouriteAction): Promise<any> {
         const user = await this.userRepository.findByUsername(username);
         if (!user) {
             throw new Error('User not found');
@@ -198,10 +198,10 @@ export class UserService {
     }
 
     async getUserFavourites(username: string, page: number = 1, limit: number = 20): Promise<{ favourites: any[], total: number, pagination: any }> {
-    return this.getFavourites(username, page, limit);
-  }
+        return this.getFavourites(username, page, limit);
+    }
 
-  async getFavourites(username: string, page: number = 1, limit: number = 20): Promise<{ favourites: any[], total: number, pagination: any }> {
+    async getFavourites(username: string, page: number = 1, limit: number = 20): Promise<{ favourites: any[], total: number, pagination: any }> {
         const user = await this.userRepository.findByUsername(username);
         if (!user) {
             throw new Error('User not found');
@@ -235,6 +235,15 @@ export class UserService {
         return await this.userRepository.markAsSeen(username, seenData.strain_name);
     }
 
+    async removeFromSeen(username: string, seenData: MarkSeen): Promise<boolean> {
+        const user = await this.userRepository.findByUsername(username);
+        if (!user) {
+            throw new Error('User not found');
+        }
+
+        return await this.userRepository.removeFromSeen(username, seenData.strain_name);
+    }
+
     async getSeenStrains(username: string, page: number = 1, limit: number = 20): Promise<{ seen: any[], total: number, pagination: any }> {
         const user = await this.userRepository.findByUsername(username);
         if (!user) {
@@ -256,31 +265,45 @@ export class UserService {
     }
 
     async hasSeenStrain(username: string, strainName: string): Promise<boolean> {
-    return await this.userRepository.hasSeenStrain(username, strainName);
-  }
+        return await this.userRepository.hasSeenStrain(username, strainName);
+    }
 
-  // Legacy methods for controller compatibility
-  async addToWishlist(username: string, wishlistData: any): Promise<any> {
-    // For now, treat wishlist same as favourites
-    return this.addFavourite(username, { strain_name: wishlistData.strain_name });
-  }
+    // Legacy methods for controller compatibility
+    async addToWishlist(username: string, wishlistData: any): Promise<any> {
+        // For now, treat wishlist same as favourites
+        return this.addFavourite(username, { strain_name: wishlistData.strain_name });
+    }
 
-  async getUserWishlist(username: string, page: number = 1, limit: number = 20): Promise<any> {
-    // For now, return empty wishlist
-    return { wishlist: [], total: 0, pagination: { page, limit, total: 0, pages: 0, hasNext: false, hasPrev: false } };
-  }
+    async getUserWishlist(username: string, page: number = 1, limit: number = 20): Promise<any> {
+        // For now, return empty wishlist
+        return { wishlist: [], total: 0, pagination: { page, limit, total: 0, pages: 0, hasNext: false, hasPrev: false } };
+    }
 
-  async markAsComplete(username: string, completeData: any): Promise<any> {
-    // Mark as seen for now
-    return this.markAsSeen(username, { strain_name: completeData.strain_name });
-  }
+    async markAsComplete(username: string, completeData: any): Promise<any> {
+        // Mark as seen for now
+        return this.markAsSeen(username, { strain_name: completeData.strain_name });
+    }
 
-  async getUserCompleted(username: string, page: number = 1, limit: number = 20): Promise<any> {
-    // For now, return seen strains as completed
-    return this.getSeenStrains(username, page, limit);
-  }
+    async removeFromCompleted(username: string, completeData: any): Promise<any> {
+        // Remove from seen for now
+        return this.removeFromSeen(username, { strain_name: completeData.strain_name });
+    }
 
-  // Validation methods
+    async getUserCompleted(username: string, page: number = 1, limit: number = 20): Promise<any> {
+        // For now, return seen strains as completed
+        return this.getSeenStrains(username, page, limit);
+    }
+
+    // Strain status checking methods
+    async getStrainStatus(username: string, strainNames: string[]): Promise<{ strain_name: string, is_liked: boolean, is_seen: boolean }[]> {
+        return await this.userRepository.getStrainStatus(username, strainNames);
+    }
+
+    async getSingleStrainStatus(username: string, strainName: string): Promise<{ strain_name: string, is_liked: boolean, is_seen: boolean } | null> {
+        return await this.userRepository.getSingleStrainStatus(username, strainName);
+    }
+
+    // Validation methods
     private validateUsername(username: string): boolean {
         const usernameRegex = /^[a-zA-Z0-9_-]{3,50}$/;
         return usernameRegex.test(username);

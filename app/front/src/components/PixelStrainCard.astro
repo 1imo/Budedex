@@ -47,14 +47,15 @@ const strainType = getStrainType(strain);
 <div class="bg-card rounded-none hover:shadow-(--pixel-box-shadow-hover) transition-all relative">
   <!-- Heart button - top right -->
   <button 
+    id={`heart-${strain.name.replace(/\s+/g, '-').toLowerCase()}`}
     class="heart-button-top-right pixel__button pixel-destructive__button box-shadow-margin text-sm font-medium px-3 py-3 flex items-center justify-center z-10 h-12"
     style="top: 16px; right: 0px;"
     title="Add to favorites"
     data-strain-name={strain.name}
     data-action="favorite"
   >
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" class="pixel-heart">
-      <path d="M4 2c-1.1 0-2 .9-2 2 0 .5.2 1 .6 1.4L8 11l5.4-5.6c.4-.4.6-.9.6-1.4 0-1.1-.9-2-2-2s-2 .9-2 2c0-1.1-.9-2-2-2z"/>
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="pixel-heart-icon">
+      <path d="M8 2.5c-1.5-2-4.5-2-6 0s-1.5 4.5 0 6l6 6 6-6c1.5-1.5 1.5-4.5 0-6s-4.5-2-6 0z"/>
     </svg>
   </button>
   
@@ -62,11 +63,11 @@ const strainType = getStrainType(strain);
     
     <!-- Image at top -->
     <img 
-      src={`https://cdn.budedex.space/strains/${strain.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}.png`} 
+      src={`${import.meta.env.PUBLIC_CDN_URL}/strains/${strain.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}.png`} 
       alt={strain.name}
       class="w-full aspect-square object-cover rounded-none mb-4"
       loading="lazy"
-      onerror="this.src='https://cdn.budedex.space/strains/default.png'"
+      onerror={`this.src='${import.meta.env.PUBLIC_CDN_URL}/strains/default.png'`}
     />
     
     <!-- Title -->
@@ -97,12 +98,13 @@ const strainType = getStrainType(strain);
       VIEW
     </a>
     <button 
+      id={`tick-${strain.name.replace(/\s+/g, '-').toLowerCase()}`}
       class="pixel__button pixel-success__button box-shadow-margin text-sm font-medium px-3 py-3 flex items-center justify-center h-12"
       title="Mark as seen"
       data-strain-name={strain.name}
       data-action="seen"
     >
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" class="pixel-check">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" class="pixel-check-icon">
         <path d="M13 4L6 11L3 8"/>
       </svg>
     </button>
@@ -150,64 +152,291 @@ const strainType = getStrainType(strain);
       renderPixelStars(container, rating);
     });
 
-    // Add click handlers for favorite and seen buttons
-    const actionButtons = document.querySelectorAll('[data-action]');
-    actionButtons.forEach(button => {
-      button.addEventListener('click', handleActionClick);
-    });
+    // Initialize card button animations
+    initCardButtonAnimations();
+    
+    // Load button states for all cards on the page
+    loadAllCardButtonStates();
   });
 
-  async function handleActionClick(event) {
-    const button = event.currentTarget;
-    const strainName = button.getAttribute('data-strain-name');
-    const action = button.getAttribute('data-action');
+  function initCardButtonAnimations() {
+    const heartButtons = document.querySelectorAll('[data-action="favorite"]');
+    const tickButtons = document.querySelectorAll('[data-action="seen"]');
     
-    // Check if user is authenticated
+    heartButtons.forEach(button => {
+      button.addEventListener('click', (e) => {
+        e.preventDefault();
+        handleCardButtonClick(button, true); // true = isHeartBtn
+      });
+    });
+    
+    tickButtons.forEach(button => {
+      button.addEventListener('click', (e) => {
+        e.preventDefault();
+        handleCardButtonClick(button, false); // false = isTickBtn
+      });
+    });
+  }
+
+  async function loadAllCardButtonStates() {
+    const authToken = localStorage.getItem('auth_token');
+    if (!authToken) return;
+
+    // Get all strain names from cards on the page
+    const strainNames = [];
+    const heartButtons = document.querySelectorAll('[data-action="favorite"]');
+    
+    heartButtons.forEach(button => {
+      const strainName = button.getAttribute('data-strain-name');
+      if (strainName && !strainNames.includes(strainName)) {
+        strainNames.push(strainName);
+      }
+    });
+
+    if (strainNames.length === 0) return;
+
+    try {
+      // Bulk API call for all strains on the page
+      const response = await fetch(`${import.meta.env.PUBLIC_API_URL}/api/rest/account/status`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          strain_names: strainNames
+        })
+      });
+
+      if (!response.ok) return;
+
+      const result = await response.json();
+      const statuses = result.data;
+
+      // Update button states based on API response
+      statuses.forEach(status => {
+        const heartBtn = document.querySelector(`[data-strain-name="${status.strain_name}"][data-action="favorite"]`);
+        const tickBtn = document.querySelector(`[data-strain-name="${status.strain_name}"][data-action="seen"]`);
+        
+        if (status.is_liked && heartBtn) {
+          setCardButtonToActiveState(heartBtn, true);
+        }
+        
+        if (status.is_seen && tickBtn) {
+          setCardButtonToActiveState(tickBtn, false);
+        }
+      });
+    } catch (error) {
+      console.error('Error loading card button states:', error);
+    }
+  }
+
+  async function handleCardButtonClick(button, isHeartBtn) {
+    // Check authentication
     const authToken = localStorage.getItem('auth_token');
     if (!authToken) {
-      // Redirect to sign in page
       window.location.href = '/account/sign-in';
       return;
     }
 
+    // Check current state by icon color
+    const icon = button.querySelector(isHeartBtn ? '.pixel-heart-icon' : '.pixel-check-icon');
+    const currentColor = getComputedStyle(icon).color;
+    const buttonDefaultColor = getComputedStyle(button).color;
+    
+    const isCurrentlyActive = currentColor !== buttonDefaultColor;
+    
     try {
-      // Disable button while processing
-      button.disabled = true;
-      button.style.opacity = '0.6';
-
-      if (action === 'favorite') {
-        // Import and call addToFavourites function
-        const { addToFavourites } = await import('../services/account');
-        await addToFavourites(strainName, authToken);
-        
-        // Visual feedback - could change heart color or show message
-        button.style.color = '#ef4444'; // red-500 for filled heart
-        button.title = 'Added to favorites!';
-        
-      } else if (action === 'seen') {
-        // Import and call markAsComplete function
-        const { markAsComplete } = await import('../services/account');
-        await markAsComplete(strainName, authToken);
-        
-        // Visual feedback - could change check color or show message
-        button.style.color = '#22c55e'; // green-500 for completed
-        button.title = 'Marked as seen!';
+      if (isCurrentlyActive) {
+        await handleCardRemoveAction(button, isHeartBtn);
+      } else {
+        await handleCardAddAction(button, isHeartBtn);
       }
-
-      // Show success message (optional)
-      console.log(`Successfully ${action === 'favorite' ? 'favorited' : 'marked as seen'}: ${strainName}`);
-      
     } catch (error) {
-      console.error(`Failed to ${action}:`, error);
-      
-      // Show error message to user
-      alert(`Failed to ${action === 'favorite' ? 'add to favorites' : 'mark as seen'}. Please try again.`);
-      
-    } finally {
-      // Re-enable button
-      button.disabled = false;
-      button.style.opacity = '1';
+      console.error('Card button action failed:', error);
     }
+  }
+
+  async function handleCardAddAction(button, isHeartBtn) {
+    const strainName = button.getAttribute('data-strain-name');
+    const endpoint = isHeartBtn ? '/api/rest/account/favourites' : '/api/rest/account/complete';
+    const authToken = localStorage.getItem('auth_token');
+    
+    try {
+      // Start animation
+      animateCardButtonClick(button, isHeartBtn);
+      
+      // Make API call
+      const response = await fetch(`${import.meta.env.PUBLIC_API_URL}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          strain_name: strainName
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      console.log(`Successfully ${isHeartBtn ? 'liked' : 'marked as seen'}: ${strainName}`);
+    } catch (error) {
+      console.error('Failed to add action:', error);
+    }
+  }
+
+  async function handleCardRemoveAction(button, isHeartBtn) {
+    const strainName = button.getAttribute('data-strain-name');
+    const endpoint = isHeartBtn ? '/api/rest/account/favourites' : '/api/rest/account/complete';
+    const authToken = localStorage.getItem('auth_token');
+    
+    try {
+      // Start reverse animation
+      animateCardButtonReverse(button, isHeartBtn);
+      
+      // Make DELETE API call
+      const response = await fetch(`${import.meta.env.PUBLIC_API_URL}${endpoint}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          strain_name: strainName
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      console.log(`Successfully removed ${isHeartBtn ? 'like' : 'seen'}: ${strainName}`);
+    } catch (error) {
+      console.error('Failed to remove action:', error);
+    }
+  }
+
+  function setCardButtonToActiveState(button, isHeartBtn) {
+    const icon = button.querySelector(isHeartBtn ? '.pixel-heart-icon' : '.pixel-check-icon');
+    const originalBgColor = isHeartBtn ? '#dc2626' : '#16a34a'; // red-600 or green-600 (darker green)
+    
+    // Change to parent button style: white background, colored icon
+    button.className = button.className.replace(/pixel-destructive__button|pixel-success__button/g, 'pixel-default__button');
+    button.style.backgroundColor = 'white';
+    
+    if (icon) {
+      icon.style.color = originalBgColor; // Icon matches original button background
+    }
+    
+    // Add reverse click listener
+    button.onclick = () => {
+      handleCardButtonClick(button, isHeartBtn);
+    };
+  }
+
+  function animateCardButtonClick(button, isHeartBtn) {
+    const icon = button.querySelector(isHeartBtn ? '.pixel-heart-icon' : '.pixel-check-icon');
+    const currentIconColor = getComputedStyle(icon).color;
+    const originalBgColor = isHeartBtn ? '#dc2626' : '#16a34a'; // red-600 or green-600 (darker green)
+    
+    // Set button to clip the expanding circle
+    button.style.overflow = 'hidden';
+    button.style.position = 'relative';
+    
+    // Create circle element with current icon color
+    const circle = document.createElement('div');
+    circle.style.position = 'absolute';
+    circle.style.top = '50%';
+    circle.style.left = '50%';
+    circle.style.width = '4px';
+    circle.style.height = '4px';
+    circle.style.backgroundColor = currentIconColor;
+    circle.style.borderRadius = '50%';
+    circle.style.transform = 'translate(-50%, -50%)';
+    circle.style.transition = 'width 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), height 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+    circle.style.zIndex = '10';
+    
+    button.appendChild(circle);
+    
+    // Phase 1: Circle balloons out (smoother)
+    setTimeout(() => {
+      circle.style.width = '140px';
+      circle.style.height = '140px';
+    }, 10);
+    
+    // Phase 2: Transform to parent button style as circle expands
+    setTimeout(() => {
+      button.className = button.className.replace(/pixel-destructive__button|pixel-success__button/g, 'pixel-default__button');
+      button.style.transition = 'background-color 0.3s ease-in-out';
+      button.style.backgroundColor = 'white';
+    }, 120);
+    
+    setTimeout(() => {
+      // Phase 3: Circle disappears and icon changes to original background color
+      circle.remove();
+      icon.style.transition = 'color 0.2s ease-in-out';
+      icon.style.color = originalBgColor; // Icon becomes the original button background color
+      button.style.overflow = 'visible';
+    }, 400);
+  }
+
+  function animateCardButtonReverse(button, isHeartBtn) {
+    const icon = button.querySelector(isHeartBtn ? '.pixel-heart-icon' : '.pixel-check-icon');
+    const currentIconColor = getComputedStyle(icon).color;
+    
+    // Get original button classes
+    const originalClasses = isHeartBtn 
+      ? 'heart-button-top-right pixel__button pixel-destructive__button box-shadow-margin text-sm font-medium px-3 py-3 flex items-center justify-center z-10 h-12'
+      : 'pixel__button pixel-success__button box-shadow-margin text-sm font-medium px-3 py-3 flex items-center justify-center h-12';
+    
+    // Set button to clip the expanding circle
+    button.style.overflow = 'hidden';
+    button.style.position = 'relative';
+    
+    // Create circle element with current icon color
+    const circle = document.createElement('div');
+    circle.style.position = 'absolute';
+    circle.style.top = '50%';
+    circle.style.left = '50%';
+    circle.style.width = '4px';
+    circle.style.height = '4px';
+    circle.style.backgroundColor = currentIconColor;
+    circle.style.borderRadius = '50%';
+    circle.style.transform = 'translate(-50%, -50%)';
+    circle.style.transition = 'width 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), height 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+    circle.style.zIndex = '10';
+    
+    button.appendChild(circle);
+    
+    // Phase 1: Circle balloons out (smoother)
+    setTimeout(() => {
+      circle.style.width = '140px';
+      circle.style.height = '140px';
+    }, 10);
+    
+    // Phase 2: Restore original button styling as circle expands
+    setTimeout(() => {
+      button.className = originalClasses;
+      button.style.transition = 'background-color 0.3s ease-in-out';
+      button.style.backgroundColor = ''; // Remove inline white background
+    }, 120);
+    
+    setTimeout(() => {
+      // Phase 3: Circle disappears and icon returns to white
+      circle.remove();
+      icon.style.transition = 'color 0.2s ease-in-out';
+      icon.style.color = ''; // Remove inline color, return to white
+      button.style.overflow = 'visible';
+      
+      // Clean up transitions after animation
+      setTimeout(() => {
+        button.style.transition = '';
+        icon.style.transition = '';
+      }, 200);
+    }, 400);
   }
 
   function renderPixelStars(container, rating) {

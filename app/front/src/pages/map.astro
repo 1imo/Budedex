@@ -257,7 +257,7 @@ import Layout from '../components/layouts/Layout.astro';
       console.log('Starting to fetch strain data from GraphQL...');
       
       // First, get the total count to know how many pages we need
-      const firstResponse = await fetch('http://localhost:4003/api/gql', {
+      const firstResponse = await fetch(`${import.meta.env.PUBLIC_API_URL}/api/gql`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -292,7 +292,7 @@ import Layout from '../components/layouts/Layout.astro';
         console.log(`Fetching pages ${chunk[0]}-${chunk[chunk.length - 1]} in parallel...`);
         
         const promises = chunk.map(page => 
-          fetch('http://localhost:4003/api/gql', {
+          fetch(`${import.meta.env.PUBLIC_API_URL}/api/gql`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

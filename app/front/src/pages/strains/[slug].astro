@@ -237,20 +237,20 @@ if (!strain && !error) {
                     <!-- Image -->
                     <div class="bg-card rounded-none">
                       <img 
-                        src={`https://cdn.budedex.space/strains/${strain.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}.png`} 
+                        src={`${import.meta.env.PUBLIC_CDN_URL}/strains/${strain.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}.png`} 
                         alt={strain.name}
                         class="w-full h-64 object-contain rounded-none"
-                        onerror="this.src='https://cdn.budedex.space/strains/default.png'"
+                        onerror={`this.src='${import.meta.env.PUBLIC_CDN_URL}/strains/default.png'`}
                       />
                     </div>
 
             <!-- Quick Actions -->
             <div class="bg-card rounded-none px-0 py-6">
               <div class="flex gap-3">
-                <button id="heart-btn" class="flex-1 pixel__button pixel-destructive__button box-shadow-margin text-sm font-medium px-4 py-3 flex items-center justify-center pixel-font uppercase" title="Add to Favorites">
+                <button id="heart-btn" class="flex-1 pixel__button pixel-destructive__button box-shadow-margin text-sm font-medium px-4 py-3 flex items-center justify-center pixel-font uppercase" title="Add to Favorites" data-strain-name={strain?.name || 'Unknown'}>
                   LIKE
                 </button>
-                <button id="tick-btn" class="flex-1 pixel__button pixel-success__button box-shadow-margin text-sm font-medium px-4 py-3 flex items-center justify-center pixel-font uppercase" title="Mark as Complete">
+                <button id="tick-btn" class="flex-1 pixel__button pixel-success__button box-shadow-margin text-sm font-medium px-4 py-3 flex items-center justify-center pixel-font uppercase" title="Mark as Complete" data-strain-name={strain?.name || 'Unknown'}>
                   COMPLETE
                 </button>
               </div>
@@ -379,18 +379,35 @@ if (!strain && !error) {
 </style>
 
 <script>
-  // Pass strain name from Astro to JavaScript
-  const STRAIN_NAME = `${strain?.name || 'Unknown'}`;
-  
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', async () => {
+    console.log('DOM Content Loaded - Initializing strain page...');
+    
     const starRatingContainer = document.getElementById('star-rating');
     const tooltip = document.getElementById('rating-tooltip');
     
     // Initialize genetics hover popovers
-    initGeneticsHovers();
+    try {
+      initGeneticsHovers();
+      console.log('Genetics hovers initialized');
+    } catch (error) {
+      console.error('Error initializing genetics hovers:', error);
+    }
     
     // Initialize button animations
-    initButtonAnimations();
+    try {
+      initButtonAnimations();
+      console.log('Button animations initialized');
+    } catch (error) {
+      console.error('Error initializing button animations:', error);
+    }
+
+    // Load and set initial button states
+    try {
+      await loadButtonStates();
+      console.log('Button states loaded');
+    } catch (error) {
+      console.error('Error loading button states:', error);
+    }
     
     if (starRatingContainer) {
       const rating = parseFloat(starRatingContainer.getAttribute('data-rating') || '0');
@@ -483,7 +500,7 @@ if (!strain && !error) {
               
               for (const variation of nameVariations) {
                 try {
-                  const response = await fetch('http://localhost:4003/api/gql', {
+                  const response = await fetch(`${import.meta.env.PUBLIC_API_URL}/api/gql`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -561,17 +578,27 @@ if (!strain && !error) {
   }
 
   function initButtonAnimations() {
+    console.log('Initializing button animations...');
     const heartBtn = document.getElementById('heart-btn');
     const tickBtn = document.getElementById('tick-btn');
     
+    console.log('Heart button found:', !!heartBtn);
+    console.log('Tick button found:', !!tickBtn);
+    
     if (heartBtn) {
-      heartBtn.addEventListener('click', () => {
+      console.log('Adding click listener to heart button');
+      heartBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        console.log('Heart button clicked!');
         handleButtonClick(heartBtn, true); // true = isHeartBtn
       });
     }
     
     if (tickBtn) {
-      tickBtn.addEventListener('click', () => {
+      console.log('Adding click listener to tick button');
+      tickBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        console.log('Tick button clicked!');
         handleButtonClick(tickBtn, false); // false = isTickBtn
       });
     }
@@ -588,7 +615,7 @@ if (!strain && !error) {
     
     // Check current button state
     const currentText = button.textContent.trim();
-    const isCurrentlyActive = currentText === 'LIKED' || currentText === 'SEEN';
+    const isCurrentlyActive = currentText === 'LIKED' || currentText === 'COMPLETED';
     
     try {
       if (isCurrentlyActive) {
@@ -604,23 +631,93 @@ if (!strain && !error) {
     }
   }
 
-  async function handleAddAction(button, isHeartBtn) {
-    const endpoint = isHeartBtn ? '/api/rest/account/favourites' : '/api/rest/account/complete';
+  async function loadButtonStates() {
     const authToken = localStorage.getItem('auth_token');
+    if (!authToken) {
+      // User not authenticated, keep default button states
+      return;
+    }
+
+    const heartBtn = document.getElementById('heart-btn');
+    const tickBtn = document.getElementById('tick-btn');
     
+    if (!heartBtn || !tickBtn) return;
+    
+    const strainName = heartBtn.getAttribute('data-strain-name');
+    if (!strainName) return;
+
     try {
-      // Start animation
-      animateButtonClick(button, isHeartBtn);
-      
-      // Make API call
-      const response = await fetch(`http://localhost:4003${endpoint}`, {
+      const response = await fetch(`${import.meta.env.PUBLIC_API_URL}/api/rest/account/status`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${authToken}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          strain_name: STRAIN_NAME
+          strain_name: strainName
+        })
+      });
+
+      if (!response.ok) {
+        console.error('Failed to load strain status:', response.status);
+        return;
+      }
+
+      const result = await response.json();
+      const status = result.data;
+
+      if (status) {
+        // Set heart button state
+        if (status.is_liked) {
+          setButtonToActiveState(heartBtn, true, 'LIKED');
+        }
+
+        // Set tick button state  
+        if (status.is_seen) {
+          setButtonToActiveState(tickBtn, false, 'COMPLETED');
+        }
+      }
+    } catch (error) {
+      console.error('Error loading button states:', error);
+    }
+  }
+
+  function setButtonToActiveState(button, isHeartBtn, activeText) {
+    const buttonColor = isHeartBtn ? '#dc2626' : '#22c55e';
+    
+    // Transform to active state without animation
+    button.className = button.className.replace(/pixel-destructive__button|pixel-success__button/g, 'pixel-default__button');
+    button.style.backgroundColor = 'white';
+    button.style.color = buttonColor;
+    button.textContent = activeText;
+    
+    // Add reverse click listener
+    button.onclick = () => {
+      const originalText = isHeartBtn ? 'LIKE' : 'COMPLETE';
+      animateButtonReverse(button, isHeartBtn, originalText);
+    };
+  }
+
+  async function handleAddAction(button, isHeartBtn) {
+    const strainName = button.getAttribute('data-strain-name');
+    const endpoint = isHeartBtn ? '/api/rest/account/favourites' : '/api/rest/account/complete';
+    const authToken = localStorage.getItem('auth_token');
+    
+    console.log('Making API call for strain:', strainName);
+    
+    try {
+      // Start animation
+      animateButtonClick(button, isHeartBtn);
+      
+      // Make API call
+      const response = await fetch(`${import.meta.env.PUBLIC_API_URL}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          strain_name: strainName
         })
       });
       
@@ -628,32 +725,34 @@ if (!strain && !error) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      console.log(`Successfully ${isHeartBtn ? 'liked' : 'marked as seen'}: ${STRAIN_NAME}`);
+      console.log(`Successfully ${isHeartBtn ? 'liked' : 'marked as seen'}: ${strainName}`);
     } catch (error) {
       console.error('Failed to add action:', error);
-      // Revert animation on error
-      location.reload(); // Simple error recovery
+      // TODO: Add proper error handling without page reload
     }
   }
 
   async function handleRemoveAction(button, isHeartBtn) {
+    const strainName = button.getAttribute('data-strain-name');
     const endpoint = isHeartBtn ? '/api/rest/account/favourites' : '/api/rest/account/complete';
     const authToken = localStorage.getItem('auth_token');
     const originalText = isHeartBtn ? 'LIKE' : 'COMPLETE';
+    
+    console.log('Making DELETE API call for strain:', strainName);
     
     try {
       // Start reverse animation
       animateButtonReverse(button, isHeartBtn, originalText);
       
       // Make DELETE API call
-      const response = await fetch(`http://localhost:4003${endpoint}`, {
+      const response = await fetch(`${import.meta.env.PUBLIC_API_URL}${endpoint}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${authToken}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          strain_name: STRAIN_NAME
+          strain_name: strainName
         })
       });
       
@@ -661,138 +760,156 @@ if (!strain && !error) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      console.log(`Successfully removed ${isHeartBtn ? 'like' : 'seen'}: ${STRAIN_NAME}`);
+      console.log(`Successfully removed ${isHeartBtn ? 'like' : 'seen'}: ${strainName}`);
     } catch (error) {
       console.error('Failed to remove action:', error);
-      // Revert animation on error
-      location.reload(); // Simple error recovery
+      // TODO: Add proper error handling without page reload
     }
   }
 
   function animateButtonClick(button, isHeartBtn) {
-    // Get the button's original color and text
+    // Get colors for the animation
     const buttonColor = isHeartBtn ? '#dc2626' : '#22c55e'; // red-600 or green-500
     const originalText = button.textContent;
+    const currentTextColor = getComputedStyle(button).color; // Color of text that's fading out
+    const currentBgColor = getComputedStyle(button).backgroundColor; // Previous background color
     
     // Set button to clip the expanding circle
     button.style.overflow = 'hidden';
     button.style.position = 'relative';
     
-    // Create white circle element
+    // Create circle element with the color of the fading text
     const circle = document.createElement('div');
     circle.style.position = 'absolute';
     circle.style.top = '50%';
     circle.style.left = '50%';
-    circle.style.width = '10px';
-    circle.style.height = '10px';
-    circle.style.backgroundColor = 'white';
+    circle.style.width = '8px';
+    circle.style.height = '8px';
+    circle.style.backgroundColor = currentTextColor; // Circle matches fading text color
     circle.style.borderRadius = '50%';
     circle.style.transform = 'translate(-50%, -50%)';
-    circle.style.transition = 'width 0.4s ease-out, height 0.4s ease-out';
+    circle.style.transition = 'width 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), height 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
     circle.style.zIndex = '10';
     
     button.appendChild(circle);
     
-    // Phase 1: Circle balloons out to fill button
+    // Phase 1: Circle balloons out to fill button (smoother)
     setTimeout(() => {
-      circle.style.width = '200px'; // Large enough to fill button
-      circle.style.height = '200px';
-    }, 10);
+      circle.style.width = '180px'; // Slightly smaller for smoother effect
+      circle.style.height = '180px';
+    }, 20);
     
-    // Phase 2: Transform to parent button style as white circle expands
+    // Phase 2: Transform to parent button style as white circle expands (smoother timing)
     setTimeout(() => {
       // Change to parent button styling (white background, black borders, colored text)
       button.className = button.className.replace(/pixel-destructive__button|pixel-success__button/g, 'pixel-default__button');
+      button.style.transition = 'background-color 0.4s ease-in-out, color 0.4s ease-in-out';
       button.style.backgroundColor = 'white';
       button.style.color = buttonColor; // Keep original button color for text
-    }, 100);
+    }, 150);
     
     setTimeout(() => {
-      // Phase 3: Circle disappears and final text appears
-      circle.remove();
+      // Phase 3: Circle disappears and final text appears (smoother)
+      circle.style.transition = 'opacity 0.3s ease-out';
+      circle.style.opacity = '0';
       
+      setTimeout(() => {
+        circle.remove();
+        
       // Replace button text with final state text
-      button.textContent = isHeartBtn ? 'LIKED' : 'SEEN';
+      button.textContent = isHeartBtn ? 'LIKED' : 'COMPLETED';
+      button.style.color = currentBgColor; // Text color matches the previous background color
       button.style.opacity = '0';
       button.style.overflow = 'visible';
       
-      // Smoother fade in for the final text and inset styling
-      button.style.transition = 'opacity 0.6s ease-in-out';
+      // Faster fade in for rapid clicking
+      button.style.transition = 'opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
       setTimeout(() => {
         button.style.opacity = '1';
-        
-        // Add click listener for reverse animation
-        button.addEventListener('click', () => {
+          
+        // Add click listener for reverse animation (allow rapid clicking)
+        button.onclick = () => {
           animateButtonReverse(button, isHeartBtn, originalText);
-        });
-      }, 50);
-    }, 500);
+        };
+        }, 50);
+      }, 200);
+    }, 400);
   }
 
   function animateButtonReverse(button, isHeartBtn, originalText) {
-    // Get original button classes and styling
+    // Get original button classes and colors
     const originalClasses = isHeartBtn 
       ? 'flex-1 pixel__button pixel-destructive__button box-shadow-margin text-sm font-medium px-4 py-3 flex items-center justify-center pixel-font uppercase'
       : 'flex-1 pixel__button pixel-success__button box-shadow-margin text-sm font-medium px-4 py-3 flex items-center justify-center pixel-font uppercase';
     
+    const currentTextColor = getComputedStyle(button).color; // Color of text that's fading out
+    const currentBgColor = getComputedStyle(button).backgroundColor; // Previous background color
+    
     // Set button to clip the expanding circle
     button.style.overflow = 'hidden';
     button.style.position = 'relative';
     
-    // Create white circle element for reverse animation
+    // Create circle element with the color of the fading text
     const circle = document.createElement('div');
     circle.style.position = 'absolute';
     circle.style.top = '50%';
     circle.style.left = '50%';
-    circle.style.width = '10px';
-    circle.style.height = '10px';
-    circle.style.backgroundColor = 'white';
+    circle.style.width = '8px';
+    circle.style.height = '8px';
+    circle.style.backgroundColor = currentTextColor; // Circle matches fading text color
     circle.style.borderRadius = '50%';
     circle.style.transform = 'translate(-50%, -50%)';
-    circle.style.transition = 'width 0.4s ease-out, height 0.4s ease-out';
+    circle.style.transition = 'width 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), height 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
     circle.style.zIndex = '10';
     
     button.appendChild(circle);
     
-    // Phase 1: Circle balloons out smoothly
+    // Phase 1: Circle balloons out smoothly (slower, more elegant)
     setTimeout(() => {
-      circle.style.width = '200px';
-      circle.style.height = '200px';
-    }, 10);
+      circle.style.width = '180px';
+      circle.style.height = '180px';
+    }, 30);
     
-    // Phase 2: Restore original button styling as white circle expands
+    // Phase 2: Restore original button styling as white circle expands (smoother timing)
     setTimeout(() => {
       button.className = originalClasses;
+      button.style.transition = 'background-color 0.5s ease-in-out, color 0.5s ease-in-out';
       button.style.backgroundColor = ''; // Restore original colored background
       button.style.color = ''; // Restore original white text color
-    }, 150);
+    }, 200);
     
     setTimeout(() => {
-      // Phase 3: Circle disappears and original text returns
-      circle.remove();
+      // Phase 3: Circle fades out smoothly
+      circle.style.transition = 'opacity 0.4s ease-out';
+      circle.style.opacity = '0';
       
-      // Restore original button text
-      button.textContent = originalText;
-      button.style.opacity = '0';
-      button.style.overflow = 'visible';
-      
-      // Smoother fade in for the original text
-      button.style.transition = 'opacity 0.8s ease-in-out';
       setTimeout(() => {
-        button.style.opacity = '1';
+        circle.remove();
         
-        // Re-add click listener for forward animation
-        button.addEventListener('click', () => {
-          animateButtonClick(button, isHeartBtn);
-        });
+        // Restore original button text
+        button.textContent = originalText;
+        button.style.color = currentBgColor; // Text color matches the previous background color
+        button.style.opacity = '0';
+        button.style.overflow = 'visible';
         
-        // Clean up
+        // Faster fade in for rapid clicking
+        button.style.transition = 'opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
         setTimeout(() => {
-          button.style.transition = '';
-          button.style.position = '';
-          button.style.overflow = '';
-        }, 200);
-      }, 50);
-    }, 500);
+          button.style.opacity = '1';
+          
+        // Re-add click listener for forward animation (allow rapid clicking)
+        button.onclick = () => {
+          animateButtonClick(button, isHeartBtn);
+        };
+          
+          // Clean up
+          setTimeout(() => {
+            button.style.transition = '';
+            button.style.position = '';
+            button.style.overflow = '';
+          }, 100);
+        }, 50);
+      }, 200);
+    }, 400);
   }
 </script>

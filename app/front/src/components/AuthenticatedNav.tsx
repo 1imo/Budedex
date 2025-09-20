@@ -17,7 +17,7 @@ export default function AuthenticatedNav({ username }: AuthenticatedNavProps) {
         try {
             const authToken = localStorage.getItem('auth_token');
             if (authToken) {
-                await fetch('http://localhost:4003/api/rest/account/logout', {
+                await fetch(`${import.meta.env.PUBLIC_API_URL}/api/rest/account/logout`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${authToken}`,

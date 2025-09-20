@@ -132,6 +132,81 @@ export class UserController {
         }
     }
 
+    async removeFromCompleted(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            const errors = validationResult(req);
+            if (!errors.isEmpty()) {
+                res.status(400).json({
+                    success: false,
+                    message: 'Validation errors',
+                    errors: errors.array()
+                });
+                return;
+            }
+
+            if (!req.user) {
+                res.status(401).json({
+                    success: false,
+                    message: 'Authentication required'
+                });
+                return;
+            }
+
+            const completeDto: CompleteDto = req.body;
+            await this.userService.removeFromCompleted(req.user.id, completeDto);
+
+            res.status(200).json({
+                success: true,
+                message: 'Removed from completed successfully'
+            });
+        } catch (error) {
+            res.status(400).json({
+                success: false,
+                message: error instanceof Error ? error.message : 'Failed to remove from completed'
+            });
+        }
+    }
+
+    async getStrainStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
+        try {
+            if (!req.user) {
+                res.status(401).json({
+                    success: false,
+                    message: 'Authentication required'
+                });
+                return;
+            }
+
+            const { strain_names, strain_name } = req.body;
+
+            if (strain_name) {
+                // Single strain status check
+                const status = await this.userService.getSingleStrainStatus(req.user.username, strain_name);
+                res.status(200).json({
+                    success: true,
+                    data: status
+                });
+            } else if (strain_names && Array.isArray(strain_names)) {
+                // Multiple strain status check
+                const statuses = await this.userService.getStrainStatus(req.user.username, strain_names);
+                res.status(200).json({
+                    success: true,
+                    data: statuses
+                });
+            } else {
+                res.status(400).json({
+                    success: false,
+                    message: 'Either strain_name or strain_names array is required'
+                });
+            }
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: error instanceof Error ? error.message : 'Failed to get strain status'
+            });
+        }
+    }
+
     async getUserProfile(req: AuthenticatedRequest, res: Response): Promise<void> {
         try {
             if (!req.user) {

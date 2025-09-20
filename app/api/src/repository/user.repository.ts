@@ -281,6 +281,12 @@ export class UserRepository {
         return result.rows[0];
     }
 
+    async removeFromSeen(username: string, strainName: string): Promise<boolean> {
+        const query = 'DELETE FROM seen WHERE username = $1 AND strain_name = $2';
+        const result = await this.pool.query(query, [username, strainName]);
+        return (result.rowCount ?? 0) > 0;
+    }
+
     async getSeenStrains(username: string, page: number = 1, limit: number = 20): Promise<{ seen: any[], total: number }> {
         const offset = (page - 1) * limit;
 
@@ -306,5 +312,40 @@ export class UserRepository {
         const query = 'SELECT 1 FROM seen WHERE username = $1 AND strain_name = $2';
         const result = await this.pool.query(query, [username, strainName]);
         return result.rows.length > 0;
+    }
+
+    // Strain status checking methods
+    async getStrainStatus(username: string, strainNames: string[]): Promise<{ strain_name: string, is_liked: boolean, is_seen: boolean }[]> {
+        const placeholders = strainNames.map((_, index) => `$${index + 2}`).join(', ');
+
+        const query = `
+            SELECT 
+                strain_names.strain_name,
+                CASE WHEN f.strain_name IS NOT NULL THEN true ELSE false END as is_liked,
+                CASE WHEN s.strain_name IS NOT NULL THEN true ELSE false END as is_seen
+            FROM (
+                SELECT unnest(ARRAY[${placeholders}]) as strain_name
+            ) strain_names
+            LEFT JOIN favourited f ON f.username = $1 AND f.strain_name = strain_names.strain_name
+            LEFT JOIN seen s ON s.username = $1 AND s.strain_name = strain_names.strain_name
+        `;
+
+        const result = await this.pool.query(query, [username, ...strainNames]);
+        return result.rows;
+    }
+
+    async getSingleStrainStatus(username: string, strainName: string): Promise<{ strain_name: string, is_liked: boolean, is_seen: boolean } | null> {
+        const query = `
+            SELECT 
+                $2 as strain_name,
+                CASE WHEN f.strain_name IS NOT NULL THEN true ELSE false END as is_liked,
+                CASE WHEN s.strain_name IS NOT NULL THEN true ELSE false END as is_seen
+            FROM (SELECT $2 as strain_name) strain_names
+            LEFT JOIN favourited f ON f.username = $1 AND f.strain_name = $2
+            LEFT JOIN seen s ON s.username = $1 AND s.strain_name = $2
+        `;
+
+        const result = await this.pool.query(query, [username, strainName]);
+        return result.rows[0] || null;
     }
 }

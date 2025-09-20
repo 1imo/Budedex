@@ -20,6 +20,9 @@ export function createAccountRoutes(
     router.post('/favourites', authMiddleware.authenticate.bind(authMiddleware), userController.addToFavourites.bind(userController));
     router.delete('/favourites', authMiddleware.authenticate.bind(authMiddleware), userController.removeFromFavourites.bind(userController));
     router.get('/favourites', authMiddleware.authenticate.bind(authMiddleware), userController.getFavourites.bind(userController));
+    router.post('/complete', authMiddleware.authenticate.bind(authMiddleware), userController.markAsComplete.bind(userController));
+    router.delete('/complete', authMiddleware.authenticate.bind(authMiddleware), userController.removeFromCompleted.bind(userController));
+    router.post('/status', authMiddleware.authenticate.bind(authMiddleware), userController.getStrainStatus.bind(userController));
 
     return router;
 }

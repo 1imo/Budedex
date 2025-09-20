@@ -139,7 +139,7 @@ import AuthenticatedNav from './AuthenticatedNav.tsx';
       
       if (authState.token) {
         try {
-          await fetch('http://localhost:4003/api/rest/account/logout', {
+          await fetch(`${import.meta.env.PUBLIC_API_URL}/api/rest/account/logout`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${authState.token}`,
@@ -282,7 +282,7 @@ import AuthenticatedNav from './AuthenticatedNav.tsx';
         showResults();
 
         try {
-          const response = await fetch('http://localhost:4003/api/gql', {
+          const response = await fetch(`${import.meta.env.PUBLIC_API_URL}/api/gql`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -319,7 +319,7 @@ import AuthenticatedNav from './AuthenticatedNav.tsx';
             <a href="/strains/${strain.name}" class="block p-3 hover:bg-gray-50 transition-colors">
               <div class="flex items-center space-x-3">
                 <div class="w-12 h-12 bg-gray-200 rounded-none flex-shrink-0">
-                  <img src="https://cdn.budedex.space/strains/${strain.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}.png" alt="${strain.name}" class="w-full h-full object-cover" onerror="this.src='https://cdn.budedex.space/strains/default.png'">
+                  <img src="${import.meta.env.PUBLIC_CDN_URL}/strains/${strain.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}.png" alt="${strain.name}" class="w-full h-full object-cover" onerror="this.src='${import.meta.env.PUBLIC_CDN_URL}/strains/default.png'">
                 </div>
                 <div class="flex-1 min-w-0">
                   <h4 class="text-sm font-medium text-gray-900 truncate pixel-font uppercase">${strain.name}</h4>
