@@ -1,144 +1,535 @@
 ---
 import Layout from '../components/layouts/Layout.astro';
-import { getLeaderboard } from '../services/graphql';
 
-// Fetch leaderboard data
-let leaderboardData = null;
-let error = null;
-
-try {
-  leaderboardData = await getLeaderboard(1, 20);
-} catch (e) {
-  error = e instanceof Error ? e.message : 'Failed to fetch leaderboard';
-}
+// Category configurations with colors and icons
+const categories = [
+  {
+    key: 'overall',
+    title: 'Overall Score',
+    description: 'Total points across all categories',
+    color: 'purple',
+    bgColor: 'bg-purple-100',
+    textColor: 'text-purple-600',
+    borderColor: 'border-purple-300',
+    points: 'Total Score'
+  },
+  {
+    key: 'favourites',
+    title: 'Favorites',
+    description: 'Strains added to favorites',
+    color: 'red',
+    bgColor: 'bg-red-100',
+    textColor: 'text-red-600',
+    borderColor: 'border-red-300',
+    points: '10 pts each'
+  },
+  {
+    key: 'seen',
+    title: 'Completed',
+    description: 'Strains marked as seen',
+    color: 'green',
+    bgColor: 'bg-green-100',
+    textColor: 'text-green-600',
+    borderColor: 'border-green-300',
+    points: '5 pts each'
+  },
+  {
+    key: 'effects',
+    title: 'Effects Explorer',
+    description: 'Unique effects discovered',
+    color: 'blue',
+    bgColor: 'bg-blue-100',
+    textColor: 'text-blue-600',
+    borderColor: 'border-blue-300',
+    points: '15 pts each'
+  },
+  {
+    key: 'flavors',
+    title: 'Flavor Connoisseur',
+    description: 'Unique flavors experienced',
+    color: 'orange',
+    bgColor: 'bg-orange-100',
+    textColor: 'text-orange-600',
+    borderColor: 'border-orange-300',
+    points: '12 pts each'
+  },
+  {
+    key: 'terpenes',
+    title: 'Terpene Expert',
+    description: 'Unique terpenes encountered',
+    color: 'indigo',
+    bgColor: 'bg-indigo-100',
+    textColor: 'text-indigo-600',
+    borderColor: 'border-indigo-300',
+    points: '20 pts each'
+  },
+  {
+    key: 'medical_conditions',
+    title: 'Medical Researcher',
+    description: 'Medical conditions explored',
+    color: 'emerald',
+    bgColor: 'bg-emerald-100',
+    textColor: 'text-emerald-600',
+    borderColor: 'border-emerald-300',
+    points: '18 pts each'
+  }
+];
 ---
 
 <Layout title="Leaderboard - Budedex">
-  <div class="container mx-auto px-4 py-8">
-    <div class="text-center mb-12 pixel__container bg-card p-8 rounded-none box-shadow-margin">
-      <h1 class="text-4xl font-bold mb-4 pixel-font uppercase tracking-wider">LEADERBOARD</h1>
-      <p class="text-xl max-w-2xl mx-auto uppercase regular-font">
-        SEE HOW YOU STACK UP AGAINST OTHER STRAIN ENTHUSIASTS. POINTS ARE EARNED BY COMPLETING STRAINS, ADDING FAVORITES, AND BUILDING YOUR WISHLIST.
+  <div class="container mx-auto py-8">
+    <!-- Hero Section -->
+    <div class="text-center mb-12 bg-card p-8 rounded-none">
+      <h1 class="text-4xl font-bold mb-4 pixel-font uppercase tracking-wider">
+        LEADERBOARD
+      </h1>
+      <p class="text-lg max-w-3xl mx-auto regular-font leading-relaxed">
+        Compete with fellow strain enthusiasts across multiple categories. Earn points by exploring strains, discovering effects, and building your cannabis knowledge.
       </p>
     </div>
 
-    {error && (
-      <div class="bg-destructive/15 text-destructive px-4 py-3 rounded-md mb-6">
-        <p>Error loading leaderboard: {error}</p>
+    <div id="error-message" class="bg-destructive/15 text-destructive px-4 py-3 rounded-md mb-6 hidden">
+      <p class="pixel-font uppercase">Error loading leaderboard data</p>
+    </div>
+
+    <div id="leaderboard-content">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {categories.map((category) => (
+          <div class={`bg-card rounded-none p-6 ${category.bgColor}`}>
+            <!-- Category Header -->
+            <div class="mb-6 pb-4">
+              <div class="flex items-center justify-between mb-2">
+                <h2 class={`text-2xl font-bold pixel-font uppercase ${category.textColor}`}>
+                  {category.title}
+                </h2>
+                <span class="text-xs pixel-font uppercase bg-white px-2 py-1">
+                  {category.points}
+                </span>
+              </div>
+              <p class="text-sm regular-font text-muted-foreground">
+                {category.description}
+              </p>
+            </div>
+
+            <!-- Leaderboard Entries -->
+            <div class="space-y-3" id={`${category.key}-leaderboard`}>
+              <!-- Top 10 will be populated by JavaScript -->
+            </div>
+
+            <!-- User's Position (if not in top 10) -->
+            <div id={`${category.key}-user-rank`} class="mt-4 pt-4 hidden">
+              <div class="text-center text-sm regular-font text-muted-foreground mb-2">
+                YOUR POSITION
+              </div>
+              <!-- User entry will be populated by JavaScript -->
+            </div>
+          </div>
+        ))}
       </div>
-    )}
+    </div>
 
-    {leaderboardData && (
-      <div class="max-w-4xl mx-auto">
-        <!-- Current User Stats -->
-        {leaderboardData.leaderboard.currentUser && (
-          <div class="bg-primary/10 border border-primary/20 rounded-lg p-6 mb-8">
-            <h2 class="text-lg font-semibold mb-4">Your Position</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div class="text-center">
-                <div class="text-2xl font-bold text-primary">
-                  #{leaderboardData.leaderboard.currentUser.rank}
-                </div>
-                <div class="text-sm text-muted-foreground">Rank</div>
-              </div>
-              <div class="text-center">
-                <div class="text-2xl font-bold text-primary">
-                  {leaderboardData.leaderboard.currentUser.score}
-                </div>
-                <div class="text-sm text-muted-foreground">Points</div>
-              </div>
-              <div class="text-center">
-                <div class="text-2xl font-bold text-primary">
-                  {leaderboardData.leaderboard.currentUser.username}
-                </div>
-                <div class="text-sm text-muted-foreground">Username</div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <!-- Leaderboard Table -->
-        <div class="rounded-xl border bg-card text-card-foreground shadow">
-          <div class="p-6">
-            <h2 class="text-xl font-semibold mb-6">Top Players</h2>
-            
-            <div class="space-y-4">
-              {leaderboardData.leaderboard.entries.map((entry: any, index: number) => (
-                <div class={`flex items-center justify-between p-4 rounded-lg ${
-                  index < 3 ? 'bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20' : 'bg-muted/50'
-                }`}>
-                  <div class="flex items-center space-x-4">
-                    <div class={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                      index === 0 ? 'bg-yellow-500 text-white' :
-                      index === 1 ? 'bg-gray-400 text-white' :
-                      index === 2 ? 'bg-amber-600 text-white' :
-                      'bg-muted text-muted-foreground'
-                    }`}>
-                      {entry.rank}
-                    </div>
-                    <div>
-                      <div class="font-medium">{entry.username}</div>
-                      <div class="text-sm text-muted-foreground">
-                        User ID: {entry.userId.substring(0, 8)}...
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div class="text-right">
-                    <div class="font-bold text-lg">{entry.score}</div>
-                    <div class="text-sm text-muted-foreground">points</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+    <!-- Scoring System -->
+    <div class="mt-12 bg-card rounded-none py-8">
+      <h3 class="text-2xl font-bold mb-6 pixel-font uppercase text-center">
+        SCORING SYSTEM
+      </h3>
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div class="text-center p-4 bg-red-100">
+          <div class="text-2xl font-bold pixel-font text-red-600 mb-2">10</div>
+          <div class="text-xs regular-font text-red-800 uppercase">Per Favorite</div>
         </div>
-
-        <!-- Scoring System -->
-        <div class="mt-12 bg-muted/50 rounded-lg p-8">
-          <h3 class="text-xl font-semibold mb-6">How Scoring Works</h3>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="text-center">
-              <div class="text-3xl font-bold text-primary mb-2">10</div>
-              <div class="font-medium mb-1">Points</div>
-              <div class="text-sm text-muted-foreground">Per completed strain</div>
-            </div>
-            <div class="text-center">
-              <div class="text-3xl font-bold text-primary mb-2">2</div>
-              <div class="font-medium mb-1">Points</div>
-              <div class="text-sm text-muted-foreground">Per favorite strain</div>
-            </div>
-            <div class="text-center">
-              <div class="text-3xl font-bold text-primary mb-2">1</div>
-              <div class="font-medium mb-1">Point</div>
-              <div class="text-sm text-muted-foreground">Per wishlist item</div>
-            </div>
-          </div>
+        <div class="text-center p-4 bg-green-100">
+          <div class="text-2xl font-bold pixel-font text-green-600 mb-2">5</div>
+          <div class="text-xs regular-font text-green-800 uppercase">Per Seen</div>
         </div>
-
-        <!-- Pagination -->
-        {leaderboardData.leaderboard.pageInfo.totalPages > 1 && (
-          <div class="flex justify-center mt-8 space-x-2">
-            {leaderboardData.leaderboard.pageInfo.hasPreviousPage && (
-              <a href={`/leaderboard?page=${leaderboardData.leaderboard.pageInfo.currentPage - 1}`} 
-                 class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground">
-                Previous
-              </a>
-            )}
-            
-            <span class="inline-flex items-center px-4 py-2 text-sm font-medium">
-              Page {leaderboardData.leaderboard.pageInfo.currentPage} of {leaderboardData.leaderboard.pageInfo.totalPages}
-            </span>
-            
-            {leaderboardData.leaderboard.pageInfo.hasNextPage && (
-              <a href={`/leaderboard?page=${leaderboardData.leaderboard.pageInfo.currentPage + 1}`}
-                 class="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground">
-                Next
-              </a>
-            )}
-          </div>
-        )}
+        <div class="text-center p-4 bg-blue-100">
+          <div class="text-2xl font-bold pixel-font text-blue-600 mb-2">15</div>
+          <div class="text-xs regular-font text-blue-800 uppercase">Per Effect</div>
+        </div>
+        <div class="text-center p-4 bg-orange-100">
+          <div class="text-2xl font-bold pixel-font text-orange-600 mb-2">12</div>
+          <div class="text-xs regular-font text-orange-800 uppercase">Per Flavor</div>
+        </div>
+        <div class="text-center p-4 bg-indigo-100">
+          <div class="text-2xl font-bold pixel-font text-indigo-600 mb-2">20</div>
+          <div class="text-xs regular-font text-indigo-800 uppercase">Per Terpene</div>
+        </div>
+        <div class="text-center p-4 bg-emerald-100">
+          <div class="text-2xl font-bold pixel-font text-emerald-600 mb-2">18</div>
+          <div class="text-xs regular-font text-emerald-800 uppercase">Per Condition</div>
+        </div>
       </div>
-    )}
+    </div>
   </div>
+
+  <script>
+    // Global API URL
+    const apiUrl = import.meta.env.PUBLIC_API_URL || 'http://localhost:4002';
+    
+    document.addEventListener('DOMContentLoaded', async () => {
+      const authToken = localStorage.getItem('auth_token');
+      const currentUsername = authToken ? JSON.parse(localStorage.getItem('user') || '{}').username : null;
+      
+      console.log('Leaderboard loading...', { authToken: !!authToken, currentUsername, apiUrl });
+      
+      try {
+        // Fetch all leaderboard data
+        console.log('Using API URL:', apiUrl);
+        
+        const [overallResponse, categoryResponse] = await Promise.all([
+          fetch(`${apiUrl}/api/gql`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: `
+                query GetLeaderboard {
+                  leaderboard(page: 1, limit: 10) {
+                    data {
+                      username
+                      total_score
+                      overall_rank
+                      level_tier
+                      favourites_count
+                      seen_count
+                      unique_effects
+                      unique_flavors
+                      unique_terpenes
+                      unique_medical_conditions
+                      favourites_rank
+                      seen_rank
+                      effects_rank
+                      flavors_rank
+                      terpenes_rank
+                      medical_conditions_rank
+                    }
+                    pagination {
+                      total
+                    }
+                  }
+                }
+              `
+            })
+          }),
+          fetch(`${apiUrl}/api/gql`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: `
+                query GetCategoryLeaders {
+                  categoryLeaders {
+                    data {
+                      category
+                      username
+                      count
+                      rank
+                    }
+                  }
+                }
+              `
+            })
+          })
+        ]);
+
+        if (!overallResponse.ok || !categoryResponse.ok) {
+          throw new Error('Failed to fetch leaderboard data');
+        }
+
+        const overallData = await overallResponse.json();
+        const categoryData = await categoryResponse.json();
+
+        if (overallData.errors || categoryData.errors) {
+          throw new Error('GraphQL errors occurred');
+        }
+
+        const leaderboard = overallData.data.leaderboard.data;
+        const categoryLeaders = categoryData.data.categoryLeaders.data;
+        
+        console.log('Leaderboard data loaded:', { leaderboard, categoryLeaders, currentUsername });
+        
+        // Render each category
+        renderCategory('overall', leaderboard, currentUsername, 'total_score', 'overall_rank');
+        
+        // Group category leaders by category
+        const groupedCategories = categoryLeaders.reduce((acc, leader) => {
+          if (!acc[leader.category]) acc[leader.category] = [];
+          acc[leader.category].push(leader);
+          return acc;
+        }, {});
+
+        // Render category-specific leaderboards
+        renderCategory('favourites', groupedCategories.favourites || [], currentUsername, 'count', 'rank');
+        renderCategory('seen', groupedCategories.seen || [], currentUsername, 'count', 'rank');
+        renderCategory('effects', groupedCategories.effects || [], currentUsername, 'count', 'rank');
+        renderCategory('flavors', groupedCategories.flavors || [], currentUsername, 'count', 'rank');
+        renderCategory('terpenes', groupedCategories.terpenes || [], currentUsername, 'count', 'rank');
+        renderCategory('medical_conditions', groupedCategories.medical_conditions || [], currentUsername, 'count', 'rank');
+
+        // If user is authenticated, always fetch their individual ranks for all categories
+        if (currentUsername) {
+          console.log('Fetching user ranks for:', currentUsername);
+          await fetchAndDisplayUserRanks(currentUsername, groupedCategories, leaderboard);
+        } else {
+          console.log('No authenticated user, skipping user rank fetch');
+        }
+
+      } catch (error) {
+        console.error('Error loading leaderboard:', error);
+        // Show error message
+        document.getElementById('error-message')?.classList.remove('hidden');
+        document.getElementById('leaderboard-content')?.classList.add('hidden');
+      }
+    });
+
+    function renderCategory(categoryKey, data, currentUsername, scoreField, rankField) {
+      const container = document.getElementById(`${categoryKey}-leaderboard`);
+      
+      if (!container || !data || data.length === 0) return;
+
+      // Check if current user is in top 10
+      const userInTop10 = currentUsername && data.some(entry => 
+        (entry.username || entry.username) === currentUsername
+      );
+
+      // Store reference for later user rank appending
+      window.categoryContainers = window.categoryContainers || {};
+      window.categoryContainers[categoryKey] = { container, userInTop10 };
+
+      // Render top 10
+      container.innerHTML = data.map((entry, index) => {
+        const isCurrentUser = currentUsername && (entry.username || entry.username) === currentUsername;
+        const rank = entry[rankField] || (index + 1);
+        const score = entry[scoreField] || entry.count || 0;
+        
+        return `
+          <div class="${isCurrentUser ? `${getCategoryDarkBg(categoryKey)}` : `${getCategorySolidBg(categoryKey)} border-2 ${getCategoryBorderColor(categoryKey)}`} 
+                      rounded-none p-3 flex items-center justify-between w-full
+                      ">
+            <div class="flex items-center space-x-3">
+              <div class="${getRankBadgeClass(rank)} w-8 h-8 rounded-none flex items-center justify-center text-sm font-bold pixel-font">
+                ${rank}
+              </div>
+              <div>
+                <div class="font-medium pixel-font uppercase ${isCurrentUser ? 'text-white' : getCategoryTextColor(categoryKey)}">
+                  ${entry.username}${isCurrentUser ? ' (YOU)' : ''}
+                </div>
+                ${entry.level_tier ? `<div class="text-xs regular-font ${isCurrentUser ? 'text-white' : getCategoryTextColor(categoryKey)} uppercase">${entry.level_tier}</div>` : ''}
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="font-bold text-lg pixel-font ${isCurrentUser ? 'text-white' : getCategoryTextColor(categoryKey)}">
+                ${score.toLocaleString()}
+              </div>
+              <div class="text-xs regular-font ${isCurrentUser ? 'text-white' : getCategoryTextColor(categoryKey)} uppercase">
+                ${categoryKey === 'overall' ? 'points' : getUnitLabel(categoryKey)}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function fetchAndDisplayUserRanks(username, groupedCategories, overallData) {
+      // Always fetch user's complete ranking data
+      console.log('fetchAndDisplayUserRanks called with:', { username, apiUrl });
+      try {
+        console.log('Making userRank API call...');
+        const response = await fetch(`${apiUrl}/api/gql`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: `
+              query GetUserRank($username: String!) {
+                userRank(username: $username) {
+                  username
+                  total_score
+                  overall_rank
+                  level_tier
+                  favourites_count
+                  seen_count
+                  unique_effects
+                  unique_flavors
+                  unique_terpenes
+                  unique_medical_conditions
+                  favourites_rank
+                  seen_rank
+                  effects_rank
+                  flavors_rank
+                  terpenes_rank
+                  medical_conditions_rank
+                }
+              }
+            `,
+            variables: { username }
+          })
+        });
+
+        if (response.ok) {
+          const userData = await response.json();
+          console.log('UserRank API response:', userData);
+          if (userData.data?.userRank) {
+            const userRankData = userData.data.userRank;
+            console.log('User rank data:', userRankData);
+            
+            // Display user rank for categories where they're NOT in top 10
+            const allCategories = ['overall', 'favourites', 'seen', 'effects', 'flavors', 'terpenes', 'medical_conditions'];
+            
+            for (const category of allCategories) {
+              const categoryInfo = window.categoryContainers[category];
+              if (categoryInfo && !categoryInfo.userInTop10) {
+                console.log(`User not in top 10 for ${category}, appending to main list`);
+                appendUserRankToMainList(category, userRankData, categoryInfo.container);
+              } else {
+                console.log(`User IS in top 10 for ${category}, already shown in main list`);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`Error fetching user ranks:`, error);
+      }
+    }
+
+    function appendUserRankToMainList(categoryKey, userData, container) {
+      console.log(`Appending user rank to main list for ${categoryKey}:`, userData);
+
+      let rank, score;
+      
+      switch (categoryKey) {
+        case 'overall':
+          rank = userData.overall_rank;
+          score = userData.total_score;
+          break;
+        case 'favourites':
+          rank = userData.favourites_rank;
+          score = userData.favourites_count;
+          break;
+        case 'seen':
+          rank = userData.seen_rank;
+          score = userData.seen_count;
+          break;
+        case 'effects':
+          rank = userData.effects_rank;
+          score = userData.unique_effects;
+          break;
+        case 'flavors':
+          rank = userData.flavors_rank;
+          score = userData.unique_flavors;
+          break;
+        case 'terpenes':
+          rank = userData.terpenes_rank;
+          score = userData.unique_terpenes;
+          break;
+        case 'medical_conditions':
+          rank = userData.medical_conditions_rank;
+          score = userData.unique_medical_conditions;
+          break;
+        default:
+          return;
+      }
+
+      if (rank && score !== undefined) {
+        // Create user entry HTML
+        const userEntryHTML = `
+          <div class="${getCategoryDarkBg(categoryKey)} rounded-none p-3 flex items-center justify-between w-full">
+            <div class="flex items-center space-x-3">
+              <div class="bg-white text-black w-8 h-8 rounded-none flex items-center justify-center text-sm font-bold pixel-font">
+                ${rank}
+              </div>
+              <div>
+                <div class="font-medium pixel-font uppercase text-white">
+                  ${userData.username} (YOU)
+                </div>
+                ${userData.level_tier ? `<div class="text-xs regular-font text-white uppercase">${userData.level_tier}</div>` : ''}
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="font-bold text-lg pixel-font text-white">
+                ${score.toLocaleString()}
+              </div>
+              <div class="text-xs regular-font text-white uppercase">
+                ${categoryKey === 'overall' ? 'points' : getUnitLabel(categoryKey)}
+              </div>
+            </div>
+          </div>
+        `;
+        
+        // Append to existing container (after top 10)
+        container.innerHTML += userEntryHTML;
+        console.log(`Successfully appended rank ${rank} for ${categoryKey} with score ${score}`);
+      } else {
+        console.log(`No rank data for ${categoryKey}:`, { rank, score, userData });
+      }
+    }
+
+    function getRankBadgeClass(rank) {
+      if (rank === 1) return 'bg-yellow-500 text-white'; // Gold
+      if (rank === 2) return 'bg-gray-400 text-white';   // Silver
+      if (rank === 3) return 'bg-amber-600 text-white';  // Bronze
+      return 'bg-muted text-muted-foreground';           // Default
+    }
+
+    function getUnitLabel(category) {
+      switch (category) {
+        case 'favourites': return 'favorites';
+        case 'seen': return 'completed';
+        case 'effects': return 'effects';
+        case 'flavors': return 'flavors';
+        case 'terpenes': return 'terpenes';
+        case 'medical_conditions': return 'conditions';
+        default: return 'points';
+      }
+    }
+
+    function getCategoryBorderColor(category) {
+      switch (category) {
+        case 'overall': return 'border-purple-600';
+        case 'favourites': return 'border-red-600';
+        case 'seen': return 'border-green-600';
+        case 'effects': return 'border-blue-600';
+        case 'flavors': return 'border-orange-600';
+        case 'terpenes': return 'border-indigo-600';
+        case 'medical_conditions': return 'border-emerald-600';
+        default: return 'border-gray-300';
+      }
+    }
+
+    function getCategorySolidBg(category) {
+      switch (category) {
+        case 'overall': return 'bg-purple-100';
+        case 'favourites': return 'bg-red-100';
+        case 'seen': return 'bg-green-100';
+        case 'effects': return 'bg-blue-100';
+        case 'flavors': return 'bg-orange-100';
+        case 'terpenes': return 'bg-indigo-100';
+        case 'medical_conditions': return 'bg-emerald-100';
+        default: return 'bg-gray-100';
+      }
+    }
+
+    function getCategoryTextColor(category) {
+      switch (category) {
+        case 'overall': return 'text-purple-800';
+        case 'favourites': return 'text-red-800';
+        case 'seen': return 'text-green-800';
+        case 'effects': return 'text-blue-800';
+        case 'flavors': return 'text-orange-800';
+        case 'terpenes': return 'text-indigo-800';
+        case 'medical_conditions': return 'text-emerald-800';
+        default: return 'text-gray-800';
+      }
+    }
+
+    function getCategoryDarkBg(category) {
+      switch (category) {
+        case 'overall': return 'bg-purple-600';
+        case 'favourites': return 'bg-red-600';
+        case 'seen': return 'bg-green-600';
+        case 'effects': return 'bg-blue-600';
+        case 'flavors': return 'bg-orange-600';
+        case 'terpenes': return 'bg-indigo-600';
+        case 'medical_conditions': return 'bg-emerald-600';
+        default: return 'bg-gray-600';
+      }
+    }
+  </script>
 </Layout>

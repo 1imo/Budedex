@@ -210,6 +210,24 @@ export async function getLeaderboard(page: number, limit: number, token?: string
           username
           score
         }
+        data {
+          username
+          total_score
+          overall_rank
+          level_tier
+          favourites_count
+          seen_count
+          unique_effects
+          unique_flavors
+          unique_terpenes
+          unique_medical_conditions
+          favourites_rank
+          seen_rank
+          effects_rank
+          flavors_rank
+          terpenes_rank
+          medical_conditions_rank
+        }
         currentUser {
           rank
           userId
@@ -223,8 +241,57 @@ export async function getLeaderboard(page: number, limit: number, token?: string
           totalPages
           total
         }
+        pagination {
+          hasNextPage
+          hasPreviousPage
+          currentPage
+          totalPages
+          total
+        }
       }
     }
   `;
   return gqlRequest(query, { page, limit }, token);
+}
+
+export async function getCategoryLeaders(token?: string) {
+  const query = `
+    query GetCategoryLeaders {
+      categoryLeaders {
+        data {
+          category
+          username
+          count
+          rank
+        }
+      }
+    }
+  `;
+  return gqlRequest(query, {}, token);
+}
+
+export async function getUserRank(username: string, token?: string) {
+  const query = `
+    query GetUserRank($username: String!) {
+      userRank(username: $username) {
+        username
+        total_score
+        overall_rank
+        level_tier
+        favourites_count
+        seen_count
+        unique_effects
+        unique_flavors
+        unique_terpenes
+        unique_medical_conditions
+        favourites_rank
+        seen_rank
+        effects_rank
+        flavors_rank
+        terpenes_rank
+        medical_conditions_rank
+      }
+    }
+  `;
+  return gqlRequest(query, { username }, token);
 }
