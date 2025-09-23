@@ -42,7 +42,7 @@ export default function AuthenticatedNav({ username }: AuthenticatedNavProps) {
                     <MenubarTrigger className="pixel__button pixel-default__button box-shadow-margin text-sm font-medium px-3 py-2 uppercase">
                         STASH
                     </MenubarTrigger>
-                    <MenubarContent>
+                    <MenubarContent className="!left-auto !right-0">
                         <MenubarItem>
                             <a href="/favourites">FAVOURITES</a>
                         </MenubarItem>
@@ -50,7 +50,14 @@ export default function AuthenticatedNav({ username }: AuthenticatedNavProps) {
                             <a href="/seen">SEEN</a>
                         </MenubarItem>
                         <MenubarItem>
+                            <a href="/achievements">ACHIEVEMENTS</a>
+                        </MenubarItem>
+                        <MenubarItem>
                             <a href="/map">MAP</a>
+                        </MenubarItem>
+                        {/* Mobile-only logout inside the STASH menu */}
+                        <MenubarItem className="md:hidden">
+                            <button onClick={handleLogout} className="w-full text-left">LOGOUT</button>
                         </MenubarItem>
                     </MenubarContent>
                 </MenubarMenu>
@@ -59,7 +66,7 @@ export default function AuthenticatedNav({ username }: AuthenticatedNavProps) {
             {/* Logout Button */}
             <button
                 onClick={handleLogout}
-                className="pixel__button pixel-destructive__button box-shadow-margin text-sm font-medium px-4 py-2 uppercase"
+                className="hidden md:inline-flex pixel__button pixel-destructive__button box-shadow-margin text-sm font-medium px-4 py-2 uppercase"
             >
                 LOGOUT
             </button>

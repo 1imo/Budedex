@@ -13,6 +13,8 @@ DROP TABLE IF EXISTS rankings_effects;
 DROP TABLE IF EXISTS rankings_flavors;
 DROP TABLE IF EXISTS rankings_terpenes;
 DROP TABLE IF EXISTS rankings_medical_benefits;
+DROP TABLE IF EXISTS user_achievements;
+DROP TABLE IF EXISTS achievements;
 DROP TABLE IF EXISTS user_sessions;
 DROP TABLE IF EXISTS seen;
 DROP TABLE IF EXISTS favourited;
@@ -204,6 +206,37 @@ CREATE TABLE user_sessions (
     user_agent TEXT,
     is_active BOOLEAN DEFAULT TRUE,
     FOREIGN KEY (username) REFERENCES users(username) ON DELETE CASCADE    -- INDEX idx_username (username)    -- INDEX idx_session_token (session_token)    -- INDEX idx_expires_at (expires_at)
+);
+
+-- =============================================================================
+-- ACHIEVEMENTS TABLES
+-- =============================================================================
+
+-- Master achievements table
+CREATE TABLE achievements (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT NOT NULL,
+    category VARCHAR(50) NOT NULL, -- 'strain_types', 'families', 'effects', 'flavors', 'terpenes', 'medical', 'exploration'
+    type VARCHAR(50) NOT NULL, -- 'count', 'percentage', 'milestone'
+    target_value INTEGER, -- Target count or percentage
+    icon VARCHAR(50), -- Icon identifier
+    rarity VARCHAR(20) DEFAULT 'common', -- 'common', 'rare', 'epic', 'legendary'
+    points INTEGER DEFAULT 0, -- Points awarded for this achievement
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- User achievements tracking
+CREATE TABLE user_achievements (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(50) NOT NULL,
+    achievement_id INTEGER NOT NULL,
+    unlocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    progress_value INTEGER DEFAULT 0, -- Current progress towards achievement
+    is_completed BOOLEAN DEFAULT FALSE,
+    FOREIGN KEY (username) REFERENCES users(username) ON DELETE CASCADE,
+    FOREIGN KEY (achievement_id) REFERENCES achievements(id) ON DELETE CASCADE,
+    UNIQUE(username, achievement_id)
 );
 
 -- =============================================================================

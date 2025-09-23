@@ -1,0 +1,416 @@
+---
+import Layout from '../components/layouts/Layout.astro';
+
+// Category configurations with colors
+const categories = [
+  {
+    key: 'strain_types',
+    title: 'Strain Types',
+    description: 'Master different cannabis strain types',
+    color: 'green',
+    bgColor: 'bg-green-100',
+    textColor: 'text-green-600',
+    darkBg: 'bg-green-600'
+  },
+  {
+    key: 'families',
+    title: 'Genetics & Families',
+    description: 'Explore strain genetics and family trees',
+    color: 'purple',
+    bgColor: 'bg-purple-100',
+    textColor: 'text-purple-600',
+    darkBg: 'bg-purple-600'
+  },
+  {
+    key: 'effects',
+    title: 'Effects Explorer',
+    description: 'Discover the full spectrum of cannabis effects',
+    color: 'blue',
+    bgColor: 'bg-blue-100',
+    textColor: 'text-blue-600',
+    darkBg: 'bg-blue-600'
+  },
+  {
+    key: 'flavors',
+    title: 'Flavor Profiles',
+    description: 'Experience diverse flavor profiles',
+    color: 'orange',
+    bgColor: 'bg-orange-100',
+    textColor: 'text-orange-600',
+    darkBg: 'bg-orange-600'
+  },
+  {
+    key: 'terpenes',
+    title: 'Terpene Discovery',
+    description: 'Uncover the world of terpenes',
+    color: 'indigo',
+    bgColor: 'bg-indigo-100',
+    textColor: 'text-indigo-600',
+    darkBg: 'bg-indigo-600'
+  },
+  {
+    key: 'medical',
+    title: 'Medical Research',
+    description: 'Research medical applications and benefits',
+    color: 'emerald',
+    bgColor: 'bg-emerald-100',
+    textColor: 'text-emerald-600',
+    darkBg: 'bg-emerald-600'
+  },
+  {
+    key: 'exploration',
+    title: 'Exploration Milestones',
+    description: 'General exploration and collection milestones',
+    color: 'red',
+    bgColor: 'bg-red-100',
+    textColor: 'text-red-600',
+    darkBg: 'bg-red-600'
+  }
+];
+---
+
+<Layout title="Achievements - Budedx">
+  <script>
+    // Initialize achievements page loading state
+    window.achievementsPageLoaded = false;
+    window.achievementsMinTimeReached = false;
+    
+    // Set minimum time
+    setTimeout(() => {
+      window.achievementsMinTimeReached = true;
+      if (window.achievementsPageLoaded) {
+        window.checkAndHide();
+      }
+    }, 1000);
+  </script>
+  
+  <div class="container mx-auto py-8">
+    <!-- Hero Section -->
+    <div class="text-center mb-12 bg-card p-8 rounded-none">
+      <h1 class="text-4xl font-bold mb-4 pixel-font uppercase tracking-wider">
+        ACHIEVEMENTS
+      </h1>
+      <p class="text-lg max-w-3xl mx-auto regular-font leading-relaxed">
+        Track your progress across multiple categories. Unlock achievements by exploring strains, discovering effects, and building your cannabis knowledge.
+      </p>
+    </div>
+
+    <!-- User Summary -->
+    <div id="user-summary" class="mb-8 bg-card rounded-none p-6 hidden">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-6 text-center justify-items-center">
+        <div class="flex flex-col items-center">
+          <div id="total-completed" class="text-3xl font-bold pixel-font text-purple-600">0</div>
+          <div class="text-sm regular-font text-muted-foreground uppercase">Completed</div>
+        </div>
+        <div class="flex flex-col items-center">
+          <div id="completion-percentage" class="text-3xl font-bold pixel-font text-blue-600">0%</div>
+          <div class="text-sm regular-font text-muted-foreground uppercase">Complete</div>
+        </div>
+        <div class="flex flex-col items-center">
+          <div id="points-earned" class="text-3xl font-bold pixel-font text-green-600">0</div>
+          <div class="text-sm regular-font text-muted-foreground uppercase">Points Earned</div>
+        </div>
+        <div class="flex flex-col items-center">
+          <div id="points-available" class="text-3xl font-bold pixel-font text-orange-600">0</div>
+          <div class="text-sm regular-font text-muted-foreground uppercase">Points Available</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="error-message" class="bg-destructive/15 text-destructive px-4 py-3 rounded-md mb-6 hidden">
+      <p class="pixel-font uppercase">Error loading achievements</p>
+    </div>
+
+    <div id="achievements-content" class="hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {categories.map((category) => (
+          <div class={`bg-card rounded-none p-6 ${category.bgColor}`}>
+            <!-- Category Header -->
+            <div class="mb-6 pb-4">
+              <div class="flex items-center justify-between mb-2">
+                <h2 class={`text-2xl font-bold pixel-font uppercase ${category.textColor}`}>
+                  {category.title}
+                </h2>
+              </div>
+              <p class="text-sm regular-font text-muted-foreground">
+                {category.description}
+              </p>
+            </div>
+
+            <!-- Achievement List -->
+            <div class="space-y-3" id={`${category.key}-achievements`}>
+              <!-- Achievements will be populated by JavaScript -->
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <!-- Recent Achievements (Global) -->
+    <div class="mt-12 bg-card rounded-none py-8">
+      <h3 class="text-2xl font-bold mb-6 pixel-font uppercase text-center">
+        RECENT ACHIEVEMENTS
+      </h3>
+      <div id="recent-achievements" class="max-w-4xl mx-auto space-y-3">
+        <!-- Recent achievements will be populated by JavaScript -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Global API URL - use environment variable or default to port 4002
+    const apiUrl = import.meta.env.PUBLIC_API_URL || 'http://localhost:4002';
+    
+    // Use global variables set in the head script
+    
+    document.addEventListener('DOMContentLoaded', async () => {
+      const authToken = localStorage.getItem('auth_token');
+      const currentUsername = authToken ? JSON.parse(localStorage.getItem('user') || '{}').username : null;
+      
+      console.log('Achievements page loading...', { authToken: !!authToken, currentUsername, apiUrl });
+      
+      if (!authToken || !currentUsername) {
+        // Redirect to sign in if not authenticated
+        window.location.href = '/account/sign-in';
+        return;
+      }
+      
+      try {
+        // Fetch user achievements and recent achievements
+        const [userResponse, recentResponse] = await Promise.all([
+          fetch(`${apiUrl}/api/rest/achievements`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${authToken}`,
+              'Content-Type': 'application/json'
+            }
+          }),
+          fetch(`${apiUrl}/api/rest/achievements/recent?limit=5`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' }
+          })
+        ]);
+
+        if (!userResponse.ok) {
+          throw new Error('Failed to fetch user achievements');
+        }
+
+        const userData = await userResponse.json();
+        const recentData = recentResponse.ok ? await recentResponse.json() : { data: [] };
+
+        console.log('Achievement data loaded:', { userData, recentData });
+
+
+        // Display user summary
+        displayUserSummary(userData.data);
+
+        // Display achievements by category
+        userData.data.categories.forEach(category => {
+          displayCategoryAchievements(category);
+        });
+
+        // Display recent achievements
+        displayRecentAchievements(recentData.data);
+
+        // Check for new achievements
+        await checkForNewAchievements(authToken);
+
+        // Show achievements content and hide loading screen
+        document.getElementById('achievements-content')?.classList.remove('hidden');
+        window.achievementsPageLoaded = true;
+        if (window.achievementsMinTimeReached) {
+          window.checkAndHide();
+        }
+
+      } catch (error) {
+        console.error('Error loading achievements:', error);
+        document.getElementById('error-message')?.classList.remove('hidden');
+        document.getElementById('achievements-content')?.classList.add('hidden');
+        
+        // Hide loading screen on error too
+        window.achievementsPageLoaded = true;
+        if (window.achievementsMinTimeReached) {
+          window.checkAndHide();
+        }
+      }
+    });
+
+    function displayUserSummary(data) {
+      document.getElementById('user-summary')?.classList.remove('hidden');
+      document.getElementById('total-completed').textContent = data.completed_achievements;
+      document.getElementById('completion-percentage').textContent = `${data.completion_percentage}%`;
+      document.getElementById('points-earned').textContent = data.total_points_earned;
+      document.getElementById('points-available').textContent = data.total_points_available;
+    }
+
+    function displayCategoryAchievements(category) {
+      const container = document.getElementById(`${category.category}-achievements`);
+      
+      if (!container) return;
+
+      // Render achievements
+      container.innerHTML = category.achievements.map(achievement => {
+        const completionPercentage = Math.min(Math.round((achievement.calculated_progress / achievement.target_value) * 100), 100);
+        const isCompleted = achievement.is_completed;
+        
+        return `
+          <div class="${isCompleted ? getCategoryDarkBg(category.category) : 'bg-white border-2 ' + getCategoryBorderColor(category.category)} 
+                      rounded-none p-4 flex items-center justify-between w-full">
+            <div class="flex items-center space-x-4">
+              <div class="${getRarityBadgeClass(achievement.rarity)} w-12 h-12 rounded-none flex items-center justify-center text-xs font-bold pixel-font">
+                ${getRarityIcon(achievement.rarity)}
+              </div>
+              <div class="flex-1">
+                <div class="font-medium pixel-font uppercase ${isCompleted ? 'text-white' : getCategoryTextColor(category.category)}">
+                  ${achievement.name}
+                </div>
+                <div class="text-xs regular-font ${isCompleted ? 'text-white' : 'text-muted-foreground'} mb-2 uppercase">
+                  ${achievement.description}
+                </div>
+                <!-- Progress Bar -->
+                <div class="w-full bg-gray-200 h-2 rounded-none">
+                  <div class="${getCategoryDarkBg(category.category)} h-2 rounded-none transition-all duration-300" 
+                       style="width: ${completionPercentage}%"></div>
+                </div>
+                <div class="text-xs regular-font ${isCompleted ? 'text-white' : 'text-muted-foreground'} mt-1">
+                  ${achievement.calculated_progress}/${achievement.target_value} (${completionPercentage}%)
+                </div>
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="font-bold text-lg pixel-font ${isCompleted ? 'text-white' : getCategoryTextColor(category.category)}">
+                +${achievement.points}
+              </div>
+              <div class="text-xs regular-font ${isCompleted ? 'text-white' : 'text-muted-foreground'} uppercase">
+                ${achievement.rarity}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function displayRecentAchievements(recentAchievements) {
+      const container = document.getElementById('recent-achievements');
+      if (!container || !recentAchievements || recentAchievements.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted-foreground pixel-font uppercase">No recent achievements</div>';
+        return;
+      }
+
+      container.innerHTML = recentAchievements.map(achievement => `
+        <div class="bg-white border-2 border-gray-300 rounded-none p-4 flex items-center justify-between">
+          <div class="flex items-center space-x-4">
+            <div class="${getRarityBadgeClass(achievement.rarity)} w-10 h-10 rounded-none flex items-center justify-center text-xs font-bold pixel-font">
+              ${getRarityIcon(achievement.rarity)}
+            </div>
+            <div>
+              <div class="font-medium pixel-font uppercase text-black">
+                ${achievement.username}
+              </div>
+              <div class="text-sm regular-font text-muted-foreground">
+                ${achievement.name}
+              </div>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="font-bold pixel-font text-black">+${achievement.points}</div>
+            <div class="text-xs regular-font text-muted-foreground">${formatTimeAgo(achievement.unlocked_at)}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function checkForNewAchievements(authToken) {
+      try {
+        const response = await fetch(`${apiUrl}/api/rest/achievements/check`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.data.newly_unlocked.length > 0) {
+            console.log('New achievements unlocked:', result.data.newly_unlocked);
+            // Could show a notification here
+          }
+        }
+      } catch (error) {
+        console.error('Error checking for new achievements:', error);
+      }
+    }
+
+    // Helper functions
+    function getCategoryDarkBg(category) {
+      const colors = {
+        'strain_types': 'bg-green-600',
+        'families': 'bg-purple-600',
+        'effects': 'bg-blue-600',
+        'flavors': 'bg-orange-600',
+        'terpenes': 'bg-indigo-600',
+        'medical': 'bg-emerald-600',
+        'exploration': 'bg-red-600'
+      };
+      return colors[category] || 'bg-gray-600';
+    }
+
+    function getCategoryBorderColor(category) {
+      const colors = {
+        'strain_types': 'border-green-600',
+        'families': 'border-purple-600',
+        'effects': 'border-blue-600',
+        'flavors': 'border-orange-600',
+        'terpenes': 'border-indigo-600',
+        'medical': 'border-emerald-600',
+        'exploration': 'border-red-600'
+      };
+      return colors[category] || 'border-gray-600';
+    }
+
+    function getCategoryTextColor(category) {
+      const colors = {
+        'strain_types': 'text-green-800',
+        'families': 'text-purple-800',
+        'effects': 'text-blue-800',
+        'flavors': 'text-orange-800',
+        'terpenes': 'text-indigo-800',
+        'medical': 'text-emerald-800',
+        'exploration': 'text-red-800'
+      };
+      return colors[category] || 'text-gray-800';
+    }
+
+    function getRarityBadgeClass(rarity) {
+      const classes = {
+        'common': 'bg-gray-500 text-white',
+        'rare': 'bg-blue-500 text-white',
+        'epic': 'bg-purple-500 text-white',
+        'legendary': 'bg-yellow-500 text-white'
+      };
+      return classes[rarity] || 'bg-gray-500 text-white';
+    }
+
+    function getRarityIcon(rarity) {
+      const icons = {
+        'common': '●',
+        'rare': '◆',
+        'epic': '★',
+        'legendary': '♦'
+      };
+      return icons[rarity] || '●';
+    }
+
+    function formatTimeAgo(timestamp) {
+      const now = new Date();
+      const time = new Date(timestamp);
+      const diffInSeconds = Math.floor((now - time) / 1000);
+      
+      if (diffInSeconds < 60) return 'Just now';
+      if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+      if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+      return `${Math.floor(diffInSeconds / 86400)}d ago`;
+    }
+  </script>
+</Layout>

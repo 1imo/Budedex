@@ -5,8 +5,8 @@ import AuthenticatedNav from './AuthenticatedNav.tsx';
 ---
 
 <header class="bg-card">
-  <div class="container mx-auto px-4 py-6">
-    <div class="border-b-4 border-black pb-6">
+  <div class="container mx-auto px-4 py-0">
+    <div class="border-b-4 border-black py-6">
     <nav class="flex items-center justify-between">
       <div class="flex items-center space-x-8">
         <a href="/" class="text-2xl font-bold text-primary pixel-brand uppercase tracking-wider">
@@ -70,7 +70,7 @@ import AuthenticatedNav from './AuthenticatedNav.tsx';
       <div class="flex items-center space-x-4" id="auth-buttons">
         <!-- Not authenticated state -->
         <div id="auth-not-logged-in" class="flex items-center space-x-3">
-          <a href="/account/sign-in" class="pixel__button pixel-secondary__button box-shadow-margin text-sm font-medium px-4 py-2 uppercase">
+          <a href="/account/sign-in" class="hidden md:inline-flex pixel__button pixel-secondary__button box-shadow-margin text-sm font-medium px-4 py-2 uppercase">
             SIGN IN
           </a>
           <a 
@@ -189,14 +189,16 @@ import AuthenticatedNav from './AuthenticatedNav.tsx';
                 <button id="stash-btn-fallback" class="pixel__button pixel-default__button box-shadow-margin text-sm font-medium px-3 py-2 uppercase">
                   STASH
                 </button>
-                <div id="stash-menu-fallback" class="absolute top-full left-0 mt-1 bg-white border-0 rounded-none hidden z-50 min-w-40" style="box-shadow: rgb(0, 0, 0) -4px 0px 0px 0px, rgb(0, 0, 0) 4px 0px 0px 0px, rgb(0, 0, 0) 0px 4px 0px 0px, rgb(0, 0, 0) 0px -4px 0px 0px, rgb(200, 200, 200) -4px 0px 0px 0px inset, rgb(200, 200, 200) 0px -4px 0px 0px inset; margin: 4px;">
+                <div id="stash-menu-fallback" class="absolute top-full right-0 mt-1 bg-white border-0 rounded-none hidden z-50 min-w-40" style="box-shadow: rgb(0, 0, 0) -4px 0px 0px 0px, rgb(0, 0, 0) 4px 0px 0px 0px, rgb(0, 0, 0) 0px 4px 0px 0px, rgb(0, 0, 0) 0px -4px 0px 0px, rgb(200, 200, 200) -4px 0px 0px 0px inset, rgb(200, 200, 200) 0px -4px 0px 0px inset; margin: 4px;">
                   <a href="/favourites" class="block px-4 py-3 text-sm font-medium hover:bg-gray-50 transition-colors pixel-font uppercase">FAVOURITES</a>
                   <a href="/seen" class="block px-4 py-3 text-sm font-medium hover:bg-gray-50 transition-colors pixel-font uppercase">SEEN</a>
+                  <a href="/achievements" class="block px-4 py-3 text-sm font-medium hover:bg-gray-50 transition-colors pixel-font uppercase">ACHIEVEMENTS</a>
                   <a href="/map" class="block px-4 py-3 text-sm font-medium hover:bg-gray-50 transition-colors pixel-font uppercase">MAP</a>
+                  <button id="fallback-logout" class="md:hidden block w-full text-left px-4 py-3 text-sm font-medium hover:bg-gray-50 transition-colors pixel-font uppercase">LOGOUT</button>
                 </div>
               </div>
-              <button onclick="localStorage.clear(); window.location.href='/';" 
-                      class="pixel__button pixel-destructive__button box-shadow-margin text-sm font-medium px-4 py-2 uppercase">
+              <button onclick="localStorage.clear(); window.location.href='/'" 
+                      class="hidden md:inline-flex pixel__button pixel-destructive__button box-shadow-margin text-sm font-medium px-4 py-2 uppercase">
                 LOGOUT
               </button>
             </div>
@@ -206,6 +208,7 @@ import AuthenticatedNav from './AuthenticatedNav.tsx';
           setTimeout(() => {
             const stashBtn = document.getElementById('stash-btn-fallback');
             const stashMenu = document.getElementById('stash-menu-fallback');
+            const fallbackLogout = document.getElementById('fallback-logout');
             
             stashBtn?.addEventListener('click', (e) => {
               e.preventDefault();
@@ -215,6 +218,16 @@ import AuthenticatedNav from './AuthenticatedNav.tsx';
             document.addEventListener('click', (e) => {
               if (!stashBtn?.contains(e.target) && !stashMenu?.contains(e.target)) {
                 stashMenu?.classList.add('hidden');
+              }
+            });
+
+            // Logout inside menu for mobile
+            fallbackLogout?.addEventListener('click', async () => {
+              try {
+                await logout();
+              } catch (e) {
+                localStorage.clear();
+                window.location.href = '/';
               }
             });
           }, 100);
@@ -314,12 +327,13 @@ import AuthenticatedNav from './AuthenticatedNav.tsx';
           const strains = data.data?.searchStrains?.strains || [];
           if (strains.length === 0) { showEmpty(); return; }
 
+          const cdn = (import.meta.env.PUBLIC_CDN_URL || 'https://cdn.budedex.space');
           searchLoading?.classList.add('hidden');
           searchItems.innerHTML = strains.map(strain => `
-            <a href="/strains/${strain.name}" class="block p-3 hover:bg-gray-50 transition-colors">
-              <div class="flex items-center space-x-3">
+          <a href="/strains/${encodeURIComponent(strain.name)}" class="block p-3 hover:bg-gray-50 transition-colors">
+          <div class="flex items-center space-x-3">
                 <div class="w-12 h-12 bg-gray-200 rounded-none flex-shrink-0">
-                  <img src="${import.meta.env.PUBLIC_CDN_URL}/strains/${strain.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}.png" alt="${strain.name}" class="w-full h-full object-cover" onerror="this.src='${import.meta.env.PUBLIC_CDN_URL}/strains/default.png'">
+                  <img src="${cdn}/strains/${strain.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}.png" alt="${strain.name}" class="w-full h-full object-cover" onerror="this.src='${cdn}/strains/default.png'">
                 </div>
                 <div class="flex-1 min-w-0">
                   <h4 class="text-sm font-medium text-gray-900 truncate pixel-font uppercase">${strain.name}</h4>

@@ -413,3 +413,142 @@ LEFT JOIN strain_medical_benefits smb ON mc.condition_name = smb.condition_name
 LEFT JOIN seen s ON smb.strain_name = s.strain_name
 GROUP BY mc.condition_name
 ORDER BY strain_count DESC, avg_effectiveness DESC;
+
+-- =============================================================================
+-- ACHIEVEMENTS VIEWS
+-- =============================================================================
+
+-- User achievement progress tracking
+CREATE VIEW user_achievement_progress AS
+SELECT 
+    u.username,
+    -- Strain type achievements
+    COUNT(DISTINCT CASE WHEN s.type = 'HYBRID' THEN s.strain_name END) as hybrid_strains_seen,
+    COUNT(DISTINCT CASE WHEN s.type = 'INDICA' THEN s.strain_name END) as indica_strains_seen,
+    COUNT(DISTINCT CASE WHEN s.type = 'SATIVA' THEN s.strain_name END) as sativa_strains_seen,
+    COUNT(DISTINCT CASE WHEN f.strain_name IS NOT NULL AND s.type = 'HYBRID' THEN s.strain_name END) as hybrid_strains_favorited,
+    COUNT(DISTINCT CASE WHEN f.strain_name IS NOT NULL AND s.type = 'INDICA' THEN s.strain_name END) as indica_strains_favorited,
+    COUNT(DISTINCT CASE WHEN f.strain_name IS NOT NULL AND s.type = 'SATIVA' THEN s.strain_name END) as sativa_strains_favorited,
+    
+    -- Family tree achievements (strains with complete parent-child chains)
+    COUNT(DISTINCT CASE 
+        WHEN sg_parent.parent_name IS NOT NULL AND sg_child.child_name IS NOT NULL 
+        THEN s.strain_name 
+    END) as complete_family_trees_seen,
+    COUNT(DISTINCT CASE 
+        WHEN f.strain_name IS NOT NULL AND sg_parent.parent_name IS NOT NULL AND sg_child.child_name IS NOT NULL 
+        THEN s.strain_name 
+    END) as complete_family_trees_favorited,
+    
+    -- Landrace strains (no parents)
+    COUNT(DISTINCT CASE 
+        WHEN sg_parent.parent_name IS NULL 
+        THEN s.strain_name 
+    END) as landrace_strains_seen,
+    COUNT(DISTINCT CASE 
+        WHEN f.strain_name IS NOT NULL AND sg_parent.parent_name IS NULL 
+        THEN s.strain_name 
+    END) as landrace_strains_favorited,
+    
+    -- Effect coverage
+    (SELECT COUNT(DISTINCT effect) FROM effects) as total_effects_available,
+    COUNT(DISTINCT ue.effect) as unique_effects_discovered,
+    ROUND(
+        (COUNT(DISTINCT ue.effect)::FLOAT / NULLIF((SELECT COUNT(DISTINCT effect) FROM effects), 0)) * 100, 
+        1
+    ) as effects_completion_percentage,
+    
+    -- Flavor coverage  
+    (SELECT COUNT(DISTINCT flavor) FROM flavors) as total_flavors_available,
+    COUNT(DISTINCT uf.flavor) as unique_flavors_discovered,
+    ROUND(
+        (COUNT(DISTINCT uf.flavor)::FLOAT / NULLIF((SELECT COUNT(DISTINCT flavor) FROM flavors), 0)) * 100, 
+        1
+    ) as flavors_completion_percentage,
+    
+    -- Terpene coverage
+    (SELECT COUNT(DISTINCT terpene_name) FROM terpenes) as total_terpenes_available,
+    COUNT(DISTINCT ut.terpene_name) as unique_terpenes_discovered,
+    ROUND(
+        (COUNT(DISTINCT ut.terpene_name)::FLOAT / NULLIF((SELECT COUNT(DISTINCT terpene_name) FROM terpenes), 0)) * 100, 
+        1
+    ) as terpenes_completion_percentage,
+    
+    -- Medical conditions coverage
+    (SELECT COUNT(DISTINCT condition_name) FROM medical_conditions) as total_conditions_available,
+    COUNT(DISTINCT um.condition_name) as unique_conditions_discovered,
+    ROUND(
+        (COUNT(DISTINCT um.condition_name)::FLOAT / NULLIF((SELECT COUNT(DISTINCT condition_name) FROM medical_conditions), 0)) * 100, 
+        1
+    ) as conditions_completion_percentage,
+    
+    -- Exploration milestones
+    COUNT(DISTINCT seen.strain_name) as total_strains_seen,
+    COUNT(DISTINCT f.strain_name) as total_strains_favorited,
+    (SELECT COUNT(*) FROM strains) as total_strains_available,
+    ROUND(
+        (COUNT(DISTINCT seen.strain_name)::FLOAT / NULLIF((SELECT COUNT(*) FROM strains), 0)) * 100, 
+        1
+    ) as strains_completion_percentage
+
+FROM users u
+LEFT JOIN seen ON u.username = seen.username
+LEFT JOIN favourited f ON u.username = f.username
+LEFT JOIN strains s ON seen.strain_name = s.name
+LEFT JOIN strain_genetics sg_parent ON s.name = sg_parent.strain_name
+LEFT JOIN strain_genetics sg_child ON s.name = sg_child.strain_name
+LEFT JOIN user_effects ue ON u.username = ue.username
+LEFT JOIN user_flavors uf ON u.username = uf.username  
+LEFT JOIN user_terpenes ut ON u.username = ut.username
+LEFT JOIN user_medical_benefits um ON u.username = um.username
+GROUP BY u.username;
+
+-- Achievement definitions with calculated progress
+CREATE VIEW achievement_status AS
+SELECT 
+    u.username,
+    a.id as achievement_id,
+    a.name,
+    a.description,
+    a.category,
+    a.type,
+    a.target_value,
+    a.icon,
+    a.rarity,
+    a.points,
+    COALESCE(ua.progress_value, 0) as current_progress,
+    COALESCE(ua.is_completed, FALSE) as is_completed,
+    ua.unlocked_at,
+    
+    -- Calculate actual progress based on achievement type
+    CASE 
+        WHEN a.category = 'strain_types' AND a.name LIKE '%Hybrid%' AND a.type = 'count' THEN uap.hybrid_strains_seen
+        WHEN a.category = 'strain_types' AND a.name LIKE '%Indica%' AND a.type = 'count' THEN uap.indica_strains_seen
+        WHEN a.category = 'strain_types' AND a.name LIKE '%Sativa%' AND a.type = 'count' THEN uap.sativa_strains_seen
+        WHEN a.category = 'families' AND a.type = 'count' THEN uap.complete_family_trees_seen
+        WHEN a.category = 'effects' AND a.type = 'percentage' THEN uap.effects_completion_percentage
+        WHEN a.category = 'flavors' AND a.type = 'percentage' THEN uap.flavors_completion_percentage
+        WHEN a.category = 'terpenes' AND a.type = 'percentage' THEN uap.terpenes_completion_percentage
+        WHEN a.category = 'medical' AND a.type = 'percentage' THEN uap.conditions_completion_percentage
+        WHEN a.category = 'exploration' AND a.name LIKE '%Total%' THEN uap.total_strains_seen
+        ELSE 0
+    END as calculated_progress,
+    
+    -- Check if achievement should be completed
+    CASE 
+        WHEN a.category = 'strain_types' AND a.name LIKE '%Hybrid%' AND a.type = 'count' THEN uap.hybrid_strains_seen >= a.target_value
+        WHEN a.category = 'strain_types' AND a.name LIKE '%Indica%' AND a.type = 'count' THEN uap.indica_strains_seen >= a.target_value
+        WHEN a.category = 'strain_types' AND a.name LIKE '%Sativa%' AND a.type = 'count' THEN uap.sativa_strains_seen >= a.target_value
+        WHEN a.category = 'families' AND a.type = 'count' THEN uap.complete_family_trees_seen >= a.target_value
+        WHEN a.category = 'effects' AND a.type = 'percentage' THEN uap.effects_completion_percentage >= a.target_value
+        WHEN a.category = 'flavors' AND a.type = 'percentage' THEN uap.flavors_completion_percentage >= a.target_value
+        WHEN a.category = 'terpenes' AND a.type = 'percentage' THEN uap.terpenes_completion_percentage >= a.target_value
+        WHEN a.category = 'medical' AND a.type = 'percentage' THEN uap.conditions_completion_percentage >= a.target_value
+        WHEN a.category = 'exploration' AND a.name LIKE '%Total%' THEN uap.total_strains_seen >= a.target_value
+        ELSE FALSE
+    END as should_be_completed
+
+FROM users u
+CROSS JOIN achievements a
+LEFT JOIN user_achievements ua ON u.username = ua.username AND a.id = ua.achievement_id
+LEFT JOIN user_achievement_progress uap ON u.username = uap.username;

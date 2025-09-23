@@ -13,19 +13,23 @@ import dotenv from 'dotenv';
 import { UserRepository } from './repository/user.repository';
 import { StrainRepository } from './repository/strain.repository';
 import { LeaderboardRepository } from './repository/leaderboard.repository';
+import { AchievementRepository } from './repository/achievement.repository';
 import { StrainService } from './services/strain.service';
 import { UserService } from './services/user.service';
 import { LeaderboardService } from './services/leaderboard.service';
 import { AuthService } from './services/auth.service';
+import { AchievementService } from './services/achievement.service';
 
 // Import controllers
 import { AuthController } from './controllers/auth.controller';
 import { UserController } from './controllers/user.controller';
+import { AchievementController } from './controllers/achievement.controller';
 
 // Import middleware and routes
 import { AuthMiddleware } from './interfaces/rest/middleware/auth.middleware';
 import { apiRateLimit, graphqlRateLimit } from './interfaces/rest/middleware/rate-limit.middleware';
 import { createAccountRoutes } from './routes/account.routes';
+import { createAchievementRoutes } from './routes/achievement.routes';
 
 // Import GraphQL schema and resolvers
 import { typeDefs } from './interfaces/gql/routes/schema';
@@ -44,16 +48,19 @@ class Server {
     private userRepository!: UserRepository;
     private strainRepository!: StrainRepository;
     private leaderboardRepository!: LeaderboardRepository;
+    private achievementRepository!: AchievementRepository;
 
     // Services
     private authService!: AuthService;
     private userService!: UserService;
     private strainService!: StrainService;
+    private achievementService!: AchievementService;
     private leaderboardService!: LeaderboardService;
 
     // Controllers
     private authController!: AuthController;
     private userController!: UserController;
+    private achievementController!: AchievementController;
 
     // Middleware
     private authMiddleware!: AuthMiddleware;
@@ -82,16 +89,19 @@ class Server {
         this.userRepository = new UserRepository(pool);
         this.strainRepository = new StrainRepository(pool);
         this.leaderboardRepository = new LeaderboardRepository(pool);
+        this.achievementRepository = new AchievementRepository(pool);
 
         // Initialize services
         this.authService = new AuthService(this.userRepository);
         this.userService = new UserService(this.userRepository);
         this.strainService = new StrainService(this.strainRepository);
         this.leaderboardService = new LeaderboardService(this.leaderboardRepository);
+        this.achievementService = new AchievementService(this.achievementRepository);
 
         // Initialize controllers
         this.authController = new AuthController(this.authService, this.userService);
         this.userController = new UserController(this.userService, this.leaderboardService);
+        this.achievementController = new AchievementController(this.achievementService);
 
         // Initialize middleware
         this.authMiddleware = new AuthMiddleware(this.authService);
@@ -110,7 +120,8 @@ class Server {
                 process.env.FRONTEND_URL || 'http://localhost:3000',
                 'http://localhost:3001', // Alternative port
                 'http://localhost:3002', // Another alternative
-                'http://localhost:4321'  // Astro default
+                'http://localhost:4321',  // Astro default
+                'http://192.168.0.98:3000' // Local network dev machine
             ],
             credentials: true
         }));
@@ -138,6 +149,11 @@ class Server {
         this.app.use('/api/rest/account', createAccountRoutes(
             this.authController,
             this.userController,
+            this.authMiddleware
+        ));
+
+        this.app.use('/api/rest/achievements', createAchievementRoutes(
+            this.achievementController,
             this.authMiddleware
         ));
 
@@ -222,7 +238,7 @@ class Server {
             // Start server
             const port = process.env.PORT || 4002;
 
-            this.httpServer.listen(port, () => {
+            this.httpServer.listen(port, '0.0.0.0', () => {
                 console.log(`🚀 Server ready at http://localhost:${port}`);
                 console.log(`📊 REST API: http://localhost:${port}/api/rest`);
                 console.log(`🎯 GraphQL: http://localhost:${port}/api/gql`);

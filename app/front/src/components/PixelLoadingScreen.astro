@@ -73,6 +73,15 @@
     
     // Check if we can hide (both conditions met)
     const checkAndHide = () => {
+      // Special handling for achievements page
+      if (window.location.pathname === '/achievements') {
+        if (window.achievementsPageLoaded && window.achievementsMinTimeReached) {
+          hideLoadingScreen();
+        }
+        return;
+      }
+      
+      // Default behavior for other pages
       if (pageLoaded && minTimeReached) {
         hideLoadingScreen();
       }
@@ -94,5 +103,8 @@
     if (document.readyState === 'complete') {
       pageLoaded = true;
     }
+    
+    // Make checkAndHide globally available for achievements page
+    window.checkAndHide = checkAndHide;
   });
 </script>

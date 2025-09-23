@@ -42,6 +42,7 @@ const getStrainType = (strain: any) => {
 };
 
 const strainType = getStrainType(strain);
+const cdn = import.meta.env.PUBLIC_CDN_URL || 'https://cdn.budedex.space';
 ---
 
 <div class="bg-card rounded-none hover:shadow-(--pixel-box-shadow-hover) transition-all relative">
@@ -63,11 +64,11 @@ const strainType = getStrainType(strain);
     
     <!-- Image at top -->
     <img 
-      src={`${import.meta.env.PUBLIC_CDN_URL}/strains/${strain.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}.png`} 
+      src={`${cdn}/strains/${strain.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}.png`} 
       alt={strain.name}
       class="w-full aspect-square object-cover rounded-none mb-4"
       loading="lazy"
-      onerror={`this.src='${import.meta.env.PUBLIC_CDN_URL}/strains/default.png'`}
+      onerror={`this.src='${cdn}/strains/default.png'`}
     />
     
     <!-- Title -->
@@ -92,7 +93,7 @@ const strainType = getStrainType(strain);
   <!-- Footer -->
   <div class="flex items-center py-4 gap-2">
     <a 
-      href={`/strains/${strain.name.toLowerCase().replace(/\s+/g, '-').replace(/:/g, '-colon-').replace(/[^a-z0-9-]/g, '')}`}
+      href={`/strains/${encodeURIComponent(strain.name)}`}
       class="pixel__button pixel-default__button box-shadow-margin text-sm font-medium px-4 py-3 flex-1 uppercase flex items-center justify-center h-12"
     >
       VIEW

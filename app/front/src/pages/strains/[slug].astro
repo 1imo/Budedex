@@ -26,26 +26,28 @@ const getStrainType = (strain: any) => {
 
 try {
   if (slug) {
-    // First try direct name lookup
-    let result = await getStrain(slug);
+    // First try direct name lookup (slug is URL-encoded name)
+    let result = await getStrain(decodeURIComponent(slug));
     
-    // If not found, try converting slug back to proper name format
+    // If not found, try fallback name transformations (case variations)
     if (!result.strain) {
-      // Convert slug to search-friendly format (handle special characters like colons)
-      const searchName = slug
-        .replace(/-colon-/g, ':')  // Convert -colon- back to :
-        .replace(/-/g, ' ')        // Convert hyphens to spaces
-        .split(' ')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-        .join(' ');
-      
-      result = await getStrain(searchName);
+      const raw = decodeURIComponent(slug);
+      const variations = [
+        raw,
+        raw.toUpperCase(),
+        raw.toLowerCase(),
+        raw.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+      ];
+      for (const v of variations) {
+        const alt = await getStrain(v);
+        if (alt.strain) { result = alt; break; }
+      }
     }
     
     // If still not found, try searching for it
     if (!result.strain) {
       const { searchStrains } = await import('../services/graphql');
-      const searchResult = await searchStrains(slug.replace(/-colon-/g, ':').replace(/-/g, ' '), 1, 1);
+      const searchResult = await searchStrains(decodeURIComponent(slug), 1, 1);
       if (searchResult.searchStrains?.strains?.length > 0) {
         const foundStrain = searchResult.searchStrains.strains[0];
         result = await getStrain(foundStrain.name);
@@ -117,10 +119,10 @@ if (!strain && !error) {
                       </div>
                     )}
 
-            <!-- Effects -->
-            {(strain.positive_effects || strain.negative_effects) && (
+            <!-- Dynamic Strain Properties -->
+            {(strain.positive_effects || strain.negative_effects || strain.flavors || strain.terpenes || strain.aliases) && (
               <div class="bg-card rounded-none px-0 py-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-10">
                   {strain.positive_effects && (
                     <div>
                       <h4 class="font-medium text-green-600 mb-3 pixel-font uppercase">Positive Effects</h4>
@@ -146,49 +148,45 @@ if (!strain && !error) {
                       </div>
                     </div>
                   )}
-                </div>
-              </div>
-            )}
 
-            <!-- Flavors & Terpenes -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {strain.flavors && (
-                <div class="bg-card rounded-none px-0 py-6">
-                  <h3 class="text-lg font-bold mb-4 pixel-font uppercase text-purple-600">Flavor Profile</h3>
-                  <div class="flex flex-wrap gap-2">
-                    {strain.flavors.split(', ').map((flavor: string) => (
-                      <span class="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm regular-font">
-                        {flavor.trim()}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
+                  {strain.flavors && (
+                    <div>
+                      <h4 class="font-medium text-purple-600 mb-3 pixel-font uppercase">Flavor Profile</h4>
+                      <div class="flex flex-wrap gap-2">
+                        {strain.flavors.split(', ').map((flavor: string) => (
+                          <span class="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm regular-font">
+                            {flavor.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-              {strain.terpenes && (
-                <div class="bg-card rounded-none px-0 py-6">
-                  <h3 class="text-lg font-bold mb-4 pixel-font uppercase text-indigo-600">Terpene Profile</h3>
-                  <div class="flex flex-wrap gap-2">
-                    {strain.terpenes.split(', ').map((terpene: string) => (
-                      <span class="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm regular-font">
-                        {terpene.trim()}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+                  {strain.terpenes && (
+                    <div>
+                      <h4 class="font-medium text-indigo-600 mb-3 pixel-font uppercase">Terpene Profile</h4>
+                      <div class="flex flex-wrap gap-2">
+                        {strain.terpenes.split(', ').map((terpene: string) => (
+                          <span class="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm regular-font">
+                            {terpene.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-            <!-- Aliases -->
-            {strain.aliases && (
-              <div class="bg-card rounded-none px-0 py-6">
-                <h3 class="text-lg font-bold mb-4 pixel-font uppercase text-orange-600">Also Known As</h3>
-                <div class="flex flex-wrap gap-2">
-                  {strain.aliases.split(', ').map((alias: string) => (
-                    <span class="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm regular-font">
-                      {alias.trim()}
-                    </span>
-                  ))}
+                  {strain.aliases && (
+                    <div>
+                      <h4 class="font-medium text-orange-600 mb-3 pixel-font uppercase">Also Known As</h4>
+                      <div class="flex flex-wrap gap-2">
+                        {strain.aliases.split(', ').map((alias: string) => (
+                          <span class="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm regular-font">
+                            {alias.trim()}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -237,10 +235,10 @@ if (!strain && !error) {
                     <!-- Image -->
                     <div class="bg-card rounded-none">
                       <img 
-                        src={`${import.meta.env.PUBLIC_CDN_URL}/strains/${strain.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}.png`} 
+                        src={`${(import.meta.env.PUBLIC_CDN_URL || 'https://cdn.budedex.space')}/strains/${strain.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}.png`} 
                         alt={strain.name}
                         class="w-full h-64 object-contain rounded-none"
-                        onerror={`this.src='${import.meta.env.PUBLIC_CDN_URL}/strains/default.png'`}
+                        onerror={`this.src='${(import.meta.env.PUBLIC_CDN_URL || 'https://cdn.budedex.space')}/strains/default.png'`}
                       />
                     </div>
 
