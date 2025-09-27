@@ -48,6 +48,10 @@ export const strainResolvers = {
             };
         },
 
+        searchExact: async (_: any, { query }: { query: string }, ctx: Context) => {
+            return await ctx.services.strain.searchExact(query);
+        },
+
         strainsByCategory: async (_: any, { category, page, limit }: { category: string; page: number; limit: number }, ctx: Context) => {
             validateStrainsArgs(page, limit);
             const result = await ctx.services.strain.getStrainsByCategory(category, page, limit);

@@ -1,0 +1,231 @@
+---
+interface Props {
+  onSearch?: (query: string) => void;
+  searchQuery?: string;
+}
+
+const { onSearch, searchQuery = '' } = Astro.props;
+---
+
+<header class="tui-header pokedex-header">
+  <!-- Search Section (Left - Flexible) -->
+  <div class="header-section flex-1">
+    <input
+      type="text"
+      class="nav-box search-input"
+      placeholder="ENTER STRAIN NAME..."
+      value={searchQuery}
+      id="strain-search"
+    />
+    <button class="nav-box nav-button" id="search-submit-btn">
+      FIND
+    </button>
+  </div>
+  
+  <!-- Stats Section (Right of Search) -->
+  <div class="header-section">
+    <div class="nav-box" id="seen-box">
+      <span id="seen-count">000</span>
+    </div>
+  </div>
+  
+  <!-- Action Buttons (Far Right) -->
+  <div class="header-section">
+    <button class="nav-box nav-button" id="leaderboard-btn">
+      LEADERBOARD
+    </button>
+    <button class="nav-box nav-button" id="achievements-btn">
+      ACHIEVEMENTS
+    </button>
+    <button class="nav-box nav-button logout-btn" id="logout-btn">
+      LOGOUT
+    </button>
+  </div>
+</header>
+
+<script>
+  // Search functionality
+  const searchInput = document.getElementById('strain-search') as HTMLInputElement;
+  const searchForm = document.querySelector('.tui-header');
+  
+  if (searchInput) {
+    // Handle Enter key
+    searchInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const query = searchInput.value.trim();
+        if (query) {
+          // Dispatch custom event for search
+          window.dispatchEvent(new CustomEvent('strain-search', { 
+            detail: { query } 
+          }));
+        }
+      }
+    });
+
+    // Handle input changes for real-time search
+    searchInput.addEventListener('input', (e) => {
+      const query = (e.target as HTMLInputElement).value.trim();
+      if (query.length > 2) {
+        window.dispatchEvent(new CustomEvent('strain-search-live', { 
+          detail: { query } 
+        }));
+      }
+    });
+  }
+  
+  // Leaderboard button
+  const leaderboardBtn = document.getElementById('leaderboard-btn');
+  leaderboardBtn?.addEventListener('click', () => {
+    console.log('🏆 Leaderboard clicked');
+    // TODO: Implement leaderboard functionality
+  });
+  
+  // Achievements button
+  const achievementsBtn = document.getElementById('achievements-btn');
+  achievementsBtn?.addEventListener('click', () => {
+    console.log('🏅 Achievements clicked');
+    // TODO: Implement achievements functionality
+  });
+  
+  // Search submit button
+  const searchSubmitBtn = document.getElementById('search-submit-btn');
+  searchSubmitBtn?.addEventListener('click', () => {
+    const searchInput = document.getElementById('strain-search') as HTMLInputElement;
+    if (searchInput) {
+      const query = searchInput.value.trim();
+      if (query) {
+        window.dispatchEvent(new CustomEvent('strain-search', { 
+          detail: { query } 
+        }));
+      }
+    }
+  });
+  
+  // Logout button
+  const logoutBtn = document.getElementById('logout-btn');
+  logoutBtn?.addEventListener('click', () => {
+    // Clear auth token
+    localStorage.removeItem('auth-token');
+    sessionStorage.removeItem('auth-token');
+    console.log('🚪 Logged out');
+    // TODO: Redirect to login page
+    // window.location.href = '/login';
+  });
+  
+  // Update stats from localStorage or API
+  function updateStats() {
+    // This would typically come from user data
+    const seenCount = localStorage.getItem('seen-strains')?.split(',').length || 0;
+    
+    const seenEl = document.getElementById('seen-count');
+    if (seenEl) seenEl.textContent = seenCount.toString().padStart(4, '0');
+  }
+  
+  // Initialize stats
+  updateStats();
+  
+  // Listen for stats updates
+  window.addEventListener('strain-stats-updated', updateStats);
+</script>
+
+<style>
+  .tui-header {
+    font-family: "Press Start 2P", "Courier New", monospace;
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+  }
+  
+  .header-section {
+    display: flex;
+    align-items: center;
+  }
+  
+  .nav-box {
+    min-height: 60px;
+    padding: 8px 12px;
+    background: hsl(var(--card));
+    border: 2px solid black;
+    border-bottom: 4px solid black;
+    color: hsl(var(--foreground));
+    font-family: "Press Start 2P", "Courier New", monospace;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+  
+  .search-input {
+    flex: 1;
+    min-width: 200px;
+    background: white;
+    color: hsl(var(--tui-green));
+    caret-color: hsl(var(--tui-green));
+    outline: none;
+    border-radius: 0;
+  }
+  
+  .search-input::placeholder {
+    color: hsl(var(--tui-gray));
+    opacity: 0.7;
+  }
+  
+  .search-input:focus {
+    outline: none;
+  }
+  
+  .nav-button {
+    cursor: pointer;
+    transition: all 0.1s;
+    white-space: nowrap;
+  }
+  
+  .nav-button:hover {
+    background: hsl(var(--tui-green));
+    color: hsl(var(--card));
+  }
+  
+  #seen-box {
+    background: hsl(var(--tui-cyan) / 0.1);
+    color: hsl(var(--tui-cyan));
+    font-weight: bold;
+    min-width: 60px;
+  }
+  
+  .logout-btn {
+    background: hsl(var(--destructive) / 0.1);
+    color: hsl(var(--destructive));
+  }
+  
+  .logout-btn:hover {
+    background: hsl(var(--destructive));
+    color: hsl(var(--destructive-foreground));
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .tui-header {
+      flex-wrap: wrap;
+    }
+    
+    .nav-button {
+      font-size: 10px;
+      padding: 6px 8px;
+      min-height: 48px;
+    }
+    
+    .search-input {
+      min-width: 150px;
+      font-size: 10px;
+      min-height: 48px;
+    }
+    
+    #seen-box {
+      font-size: 10px;
+      min-height: 48px;
+      min-width: 40px;
+    }
+  }
+</style>

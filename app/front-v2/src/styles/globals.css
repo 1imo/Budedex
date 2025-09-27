@@ -1,0 +1,338 @@
+@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* TUI-inspired light color scheme with white background */
+    --background: 0 0% 98%;
+    --foreground: 0 0% 5%;
+    --card: 0 0% 95%;
+    --card-foreground: 0 0% 5%;
+    --popover: 0 0% 95%;
+    --popover-foreground: 0 0% 5%;
+    --primary: 142 76% 36%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 90%;
+    --secondary-foreground: 0 0% 5%;
+    --muted: 0 0% 92%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 142 76% 36%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 80%;
+    --input: 0 0% 90%;
+    --ring: 142 76% 36%;
+    
+    /* TUI-specific colors for light theme */
+    --tui-green: 120 100% 30%;
+    --tui-cyan: 180 100% 35%;
+    --tui-blue: 240 100% 45%;
+    --tui-yellow: 45 100% 40%;
+    --tui-red: 0 100% 45%;
+    --tui-magenta: 300 100% 40%;
+    --tui-white: 0 0% 5%;
+    --tui-gray: 0 0% 60%;
+    --tui-black: 0 0% 100%;
+    
+    /* Pokédex-inspired colors */
+    --pokedex-red: 0 85% 55%;
+    --pokedex-blue: 220 85% 55%;
+    --pokedex-screen-bg: 120 30% 85%;
+    --pokedex-screen-border: 120 50% 30%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-mono;
+    font-family: "Press Start 2P", "Courier New", monospace;
+    line-height: 1.6;
+  }
+}
+
+@layer components {
+  /* TUI Container Styles */
+  .tui-container {
+    @apply bg-card border-2 border-solid;
+    border-color: hsl(var(--tui-green));
+    box-shadow: 
+      inset 0 0 0 1px hsl(var(--tui-gray) / 0.3),
+      0 0 8px hsl(var(--tui-green) / 0.3);
+  }
+  
+  .tui-window {
+    @apply tui-container p-0 m-0;
+    border-style: double;
+    border-width: 3px;
+  }
+  
+  .tui-panel {
+    @apply bg-card/80 border border-solid p-1;
+    border-color: hsl(var(--tui-gray));
+  }
+  
+  /* Pokédex Styles */
+  .pokedex-screen {
+    @apply border-4 border-solid p-2;
+    background: linear-gradient(135deg, 
+      hsl(var(--pokedex-screen-bg)) 0%, 
+      hsl(var(--pokedex-screen-bg) / 0.8) 100%);
+    border-color: hsl(var(--pokedex-screen-border));
+    box-shadow: 
+      inset 0 0 10px hsl(var(--pokedex-screen-border) / 0.5),
+      0 0 15px hsl(var(--tui-green) / 0.2);
+  }
+  
+  .pokedex-grid {
+    @apply grid gap-0 p-0;
+    background: transparent;
+    border: none;
+    grid-area: grid;
+    grid-template-columns: repeat(10, 1fr);
+    overflow-y: auto;
+    position: relative;
+    width: 100%;
+  }
+  
+  .strain-sprite {
+    aspect-ratio: 1 / 1;
+    width: 100% !important;
+    height: 0 !important;
+    padding-bottom: 100% !important;
+    cursor: pointer;
+    background: transparent !important;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+    position: relative;
+    overflow: hidden;
+    display: block;
+  }
+  
+  /* Ensure all images inside strain-sprite containers get proper sizing */
+  .strain-sprite img {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    display: block;
+  }
+  
+  /* Fallback styling for strain-sprites without images or broken images */
+  .strain-sprite:empty,
+  .strain-sprite img[src=""],
+  .strain-sprite img:not([src]) {
+    background: transparent !important;
+  }
+  
+  /* Ensure any div inside pokedex-grid that doesn't have strain-sprite class gets it */
+  .pokedex-grid > div:not(.strain-sprite) {
+    display: none !important;
+  }
+  
+  .strain-sprite:hover {
+    z-index: 10;
+  }
+  
+  .strain-sprite.selected {
+    border-color: hsl(var(--tui-red));
+  }
+
+/* Seen strains appear normal */
+.strain-seen {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+/* Unseen strains get ghost effect */
+.force-ghost {
+  filter: grayscale(100%) brightness(0.54) contrast(40) !important;
+  opacity: 0.6 !important;
+}  /* Force all grid children to be strain-sprite styled */
+  .pokedex-grid > div {
+    aspect-ratio: 1 / 1;
+    width: 100% !important;
+    height: 0 !important;
+    padding-bottom: 100% !important;
+    cursor: pointer;
+    background: transparent !important;
+    position: relative;
+    overflow: hidden;
+    display: block;
+  }
+  
+  /* TUI Header */
+  .tui-header {
+    @apply flex items-center;
+    background: hsl(var(--card));
+  }
+  
+  .tui-search-box {
+    @apply flex-1 bg-white border-2 border-solid p-2 font-mono;
+    border-color: hsl(var(--tui-green));
+    color: hsl(var(--tui-green));
+    font-family: "Press Start 2P", "Courier New", monospace;
+    font-size: 14px;
+  }
+  
+  .tui-search-box:focus {
+    @apply outline-none;
+    box-shadow: 0 0 8px hsl(var(--tui-green) / 0.6);
+  }
+  
+  .tui-button {
+    @apply px-4 py-2 border-2 border-solid cursor-pointer transition-all duration-75 font-mono;
+    border-color: hsl(var(--tui-gray));
+    background: hsl(var(--card));
+    color: hsl(var(--foreground));
+    font-family: "Press Start 2P", "Courier New", monospace;
+    font-size: 12px;
+  }
+  
+  .tui-button:hover {
+    border-color: hsl(var(--tui-yellow));
+    background: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
+  }
+  
+  .tui-button:active {
+    @apply transform translate-y-0.5;
+  }
+  
+  .tui-button.primary {
+    border-color: hsl(var(--tui-green));
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+  }
+  
+  .tui-button.danger {
+    border-color: hsl(var(--tui-red));
+    background: hsl(var(--destructive));
+    color: hsl(var(--destructive-foreground));
+  }
+  
+  /* Detail Pane */
+  .strain-detail-pane {
+    @apply p-4;
+    background: linear-gradient(135deg, 
+      hsl(var(--card)) 0%, 
+      hsl(var(--muted)) 100%);
+    border: none;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .strain-detail-image {
+    @apply w-32 h-32 border-4 border-solid mx-auto mb-4;
+    border-color: hsl(var(--tui-blue));
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+  }
+  
+  .strain-stat {
+    @apply flex justify-between items-center py-1 px-2 mb-1 border border-solid;
+    border-color: hsl(var(--tui-gray) / 0.3);
+    background: hsl(var(--muted) / 0.5);
+  }
+  
+  .strain-type {
+    @apply inline-block px-2 py-1 text-xs border border-solid;
+    border-color: hsl(var(--tui-cyan));
+    background: hsl(var(--tui-cyan) / 0.1);
+    color: hsl(var(--tui-cyan));
+  }
+  
+  /* Responsive Grid */
+  .pokedex-layout {
+    @apply grid h-screen gap-0;
+    grid-template-areas: 
+      "header header"
+      "grid detail";
+    grid-template-rows: auto 1fr;
+    grid-template-columns: 1fr 33.333vw;
+  }
+  
+  .pokedex-header {
+    grid-area: header;
+  }  .pokedex-detail-area {
+    grid-area: detail;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-left: 4px solid black;
+  }
+  
+  /* Responsive grid columns */
+  @media (max-width: 1024px) {
+    .pokedex-grid {
+      grid-template-columns: repeat(8, 1fr) !important;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .pokedex-grid {
+      grid-template-columns: repeat(6, 1fr) !important;
+    }
+    
+    .pokedex-layout {
+      grid-template-areas: 
+        "header"
+        "detail"
+        "grid";
+      grid-template-rows: auto 300px 1fr;
+      grid-template-columns: 1fr;
+    }
+    
+    .pokedex-detail-area {
+      border: none;
+    }
+    
+    .strain-detail-pane {
+      border: none;
+    }
+  }
+  
+  @media (max-width: 600px) {
+    .pokedex-grid {
+      grid-template-columns: repeat(5, 1fr) !important;
+    }
+  }
+  
+  /* Scrollbar Styling */
+  .tui-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--tui-green)) hsl(var(--muted));
+  }
+  
+  .tui-scrollbar::-webkit-scrollbar {
+    width: 12px;
+  }
+  
+  .tui-scrollbar::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border: 1px solid hsl(var(--border));
+  }
+  
+  .tui-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(var(--tui-green));
+    border: 1px solid hsl(var(--tui-gray));
+  }
+  
+  .tui-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--tui-yellow));
+  }
+}

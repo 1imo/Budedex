@@ -1,0 +1,581 @@
+---
+interface Strain {
+  name: string;
+  url: string;
+  type: string;
+  thc?: number;
+  cbd?: number;
+  rating?: number;
+  review_count?: number;
+  top_effect?: string;
+  category: string;
+  image_path?: string;
+  image_url?: string;
+  description?: string;
+  aliases?: string[];
+  positive_effects?: string[];
+  negative_effects?: string[];
+  flavors?: string[];
+  terpenes?: string[];
+  medical_benefits?: string[];
+  parents?: string[];
+  children?: string[];
+  strainNumber?: number;
+}
+
+interface Props {
+  selectedStrain?: Strain | null;
+}
+
+const { selectedStrain = null } = Astro.props;
+---
+
+<div class="pokedex-detail-area">
+  <div class="strain-detail-pane" id="strain-detail-pane">
+    {selectedStrain ? (
+      <!-- Strain Selected -->
+      <div class="strain-info">
+        <!-- Header -->
+        <div class="text-center mb-4">
+          <div class="text-sm text-tui-cyan uppercase tracking-wider mb-1">
+            #{selectedStrain.strainNumber || 'XXX'}
+          </div>
+          <h2 class="text-lg text-tui-green uppercase tracking-wider mb-1">
+            {selectedStrain.name}
+          </h2>
+          <div class="flex justify-center gap-2 mb-2">
+            <span class="strain-type">{selectedStrain.category}</span>
+            <span class="strain-type">{selectedStrain.type}</span>
+          </div>
+        </div>
+        
+        <!-- Image -->
+        <div class="text-center mb-4">
+          <img
+            src={selectedStrain.image_url || `/api/images/${selectedStrain.image_path}`}
+            alt={selectedStrain.name}
+            class="strain-detail-image"
+            loading="lazy"
+          />
+        </div>
+        
+        <!-- Quick Stats Grid -->
+        <div class="grid grid-cols-2 gap-2 mb-4">
+          {selectedStrain.thc && (
+            <div class="strain-stat">
+              <span class="text-tui-red">THC:</span>
+              <span class="text-tui-white">{selectedStrain.thc}%</span>
+            </div>
+          )}
+          {selectedStrain.cbd && (
+            <div class="strain-stat">
+              <span class="text-tui-blue">CBD:</span>
+              <span class="text-tui-white">{selectedStrain.cbd}%</span>
+            </div>
+          )}
+          {selectedStrain.rating && (
+            <div class="strain-stat">
+              <span class="text-tui-yellow">RATING:</span>
+              <span class="text-tui-white">{selectedStrain.rating}/5</span>
+            </div>
+          )}
+          {selectedStrain.review_count && (
+            <div class="strain-stat">
+              <span class="text-tui-cyan">REVIEWS:</span>
+              <span class="text-tui-white">{selectedStrain.review_count}</span>
+            </div>
+          )}
+        </div>
+        
+        <!-- Description -->
+        {selectedStrain.description && (
+          <div class="mb-4">
+            <div class="text-xs text-tui-green uppercase mb-2">DESCRIPTION:</div>
+            <div class="tui-panel p-2 text-xs">
+              <p class="text-foreground/90 leading-relaxed">
+                {selectedStrain.description.slice(0, 200)}
+                {selectedStrain.description.length > 200 && '...'}
+              </p>
+            </div>
+          </div>
+        )}
+        
+        <!-- Primary Effect -->
+        {selectedStrain.top_effect && (
+          <div class="mb-4">
+            <div class="text-xs text-tui-green uppercase mb-1">PRIMARY EFFECT:</div>
+            <div class="tui-panel p-2 text-center">
+              <span class="text-sm text-tui-yellow uppercase">
+                {selectedStrain.top_effect}
+              </span>
+            </div>
+          </div>
+        )}
+        
+        <!-- Effects Grid -->
+        <div class="grid grid-cols-1 gap-3 mb-4">
+          {selectedStrain.positive_effects && selectedStrain.positive_effects.length > 0 && (
+            <div>
+              <div class="text-xs text-tui-green uppercase mb-1">POSITIVE EFFECTS:</div>
+              <div class="flex flex-wrap gap-1">
+                {selectedStrain.positive_effects.slice(0, 6).map((effect: string) => (
+                  <span class="text-xs px-2 py-1 bg-tui-green/20 text-tui-green border border-tui-green/50">
+                    {effect}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {selectedStrain.negative_effects && selectedStrain.negative_effects.length > 0 && (
+            <div>
+              <div class="text-xs text-tui-red uppercase mb-1">SIDE EFFECTS:</div>
+              <div class="flex flex-wrap gap-1">
+                {selectedStrain.negative_effects.slice(0, 4).map((effect: string) => (
+                  <span class="text-xs px-2 py-1 bg-tui-red/20 text-tui-red border border-tui-red/50">
+                    {effect}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {selectedStrain.flavors && selectedStrain.flavors.length > 0 && (
+            <div>
+              <div class="text-xs text-tui-cyan uppercase mb-1">FLAVORS:</div>
+              <div class="flex flex-wrap gap-1">
+                {selectedStrain.flavors.slice(0, 5).map((flavor: string) => (
+                  <span class="text-xs px-2 py-1 bg-tui-cyan/20 text-tui-cyan border border-tui-cyan/50">
+                    {flavor}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        
+        <!-- Terpenes & Medical -->
+        {(selectedStrain.terpenes || selectedStrain.medical_benefits) && (
+          <div class="grid grid-cols-1 gap-3 mb-4">
+            {selectedStrain.terpenes && selectedStrain.terpenes.length > 0 && (
+              <div>
+                <div class="text-xs text-tui-magenta uppercase mb-1">TERPENES:</div>
+                <div class="flex flex-wrap gap-1">
+                  {selectedStrain.terpenes.slice(0, 4).map((terpene: string) => (
+                    <span class="text-xs px-2 py-1 bg-purple-500/20 text-purple-400 border border-purple-500/50">
+                      {terpene}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {selectedStrain.medical_benefits && selectedStrain.medical_benefits.length > 0 && (
+              <div>
+                <div class="text-xs text-tui-blue uppercase mb-1">MEDICAL:</div>
+                <div class="flex flex-wrap gap-1">
+                  {selectedStrain.medical_benefits.slice(0, 3).map((benefit: string) => (
+                    <span class="text-xs px-2 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/50">
+                      {benefit.replace(/\s*\(\d+%\)/, '')}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        
+        <!-- Genetics -->
+        {(selectedStrain.parents || selectedStrain.children) && (
+          <div class="mb-4">
+            <div class="text-xs text-tui-green uppercase mb-2">GENETICS:</div>
+            <div class="tui-panel p-2 space-y-2">
+              {selectedStrain.parents && selectedStrain.parents.length > 0 && (
+                <div>
+                  <span class="text-xs text-tui-yellow uppercase">PARENTS:</span>
+                  <div class="text-xs text-foreground/80 mt-1">
+                    {selectedStrain.parents.slice(0, 2).join(' × ')}
+                  </div>
+                </div>
+              )}
+              {selectedStrain.children && selectedStrain.children.length > 0 && (
+                <div>
+                  <span class="text-xs text-tui-yellow uppercase">CHILDREN:</span>
+                  <div class="text-xs text-foreground/80 mt-1">
+                    {selectedStrain.children.slice(0, 3).join(', ')}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        
+        <!-- Actions -->
+        <div class="flex gap-2 mt-4">
+          <button class="tui-button primary flex-1" id="catch-btn">
+            CATCH
+          </button>
+          <button class="tui-button flex-1" id="details-btn">
+            MORE INFO
+          </button>
+        </div>
+      </div>
+    ) : (
+      <!-- No Strain Selected -->
+      <div class="flex items-center justify-center h-full text-center">
+        <div>
+          <div class="text-6xl mb-4">🔍</div>
+          <h3 class="text-lg text-tui-green uppercase mb-2">SELECT A STRAIN</h3>
+          <p class="text-sm text-muted-foreground">
+            Click on a strain image to view its details
+          </p>
+          <div class="mt-4 text-xs text-muted-foreground">
+            <p>Navigate using the grid on the left</p>
+            <p class="mt-1">Search to filter strains</p>
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
+</div>
+
+<script>
+  let currentStrain: any = null;
+  
+  // Listen for strain selection
+  window.addEventListener('strain-selected', (e: any) => {
+    const strain = e.detail.strain;
+    currentStrain = strain;
+    updateDetailPane(strain);
+  });
+  
+  function updateDetailPane(strain: any) {
+    const detailPane = document.getElementById('strain-detail-pane');
+    if (!detailPane) return;
+    
+    const html = `
+      <div class="strain-info">
+        <!-- Header -->
+        <div class="text-center mb-4">
+          <div class="text-sm text-tui-cyan uppercase tracking-wider mb-1">
+            #${strain.strainNumber || 'XXX'}
+          </div>
+          <h2 class="text-lg text-tui-green uppercase tracking-wider mb-1">
+            ${strain.name}
+          </h2>
+          <div class="flex justify-center gap-2 mb-2">
+            <span class="strain-type">${strain.category || 'HYBRID'}</span>
+            <span class="strain-type">${strain.type || 'UNKNOWN'}</span>
+          </div>
+        </div>
+        
+        <!-- Image -->
+        <div class="text-center mb-4">
+          <img
+            src="${strain.image_url || `/api/images/${strain.image_path}`}"
+            alt="${strain.name}"
+            class="strain-detail-image"
+            loading="lazy"
+          />
+        </div>
+        
+        <!-- Quick Stats Grid -->
+        <div class="grid grid-cols-2 gap-2 mb-4">
+          ${strain.thc ? `
+            <div class="strain-stat">
+              <span class="text-tui-red">THC:</span>
+              <span class="text-tui-white">${strain.thc}%</span>
+            </div>
+          ` : ''}
+          ${strain.cbd ? `
+            <div class="strain-stat">
+              <span class="text-tui-blue">CBD:</span>
+              <span class="text-tui-white">${strain.cbd}%</span>
+            </div>
+          ` : ''}
+          ${strain.rating ? `
+            <div class="strain-stat">
+              <span class="text-tui-yellow">RATING:</span>
+              <span class="text-tui-white">${strain.rating}/5</span>
+            </div>
+          ` : ''}
+          ${strain.review_count ? `
+            <div class="strain-stat">
+              <span class="text-tui-cyan">REVIEWS:</span>
+              <span class="text-tui-white">${strain.review_count}</span>
+            </div>
+          ` : ''}
+        </div>
+        
+        <!-- Description -->
+        ${strain.description ? `
+          <div class="mb-4">
+            <div class="text-xs text-tui-green uppercase mb-2">DESCRIPTION:</div>
+            <div class="tui-panel p-2 text-xs">
+              <p class="text-foreground/90 leading-relaxed">
+                ${strain.description.slice(0, 200)}${strain.description.length > 200 ? '...' : ''}
+              </p>
+            </div>
+          </div>
+        ` : ''}
+        
+        <!-- Primary Effect -->
+        ${strain.top_effect ? `
+          <div class="mb-4">
+            <div class="text-xs text-tui-green uppercase mb-1">PRIMARY EFFECT:</div>
+            <div class="tui-panel p-2 text-center">
+              <span class="text-sm text-tui-yellow uppercase">
+                ${strain.top_effect}
+              </span>
+            </div>
+          </div>
+        ` : ''}
+        
+        <!-- Effects Grid -->
+        <div class="grid grid-cols-1 gap-3 mb-4">
+          ${strain.positive_effects && strain.positive_effects.length > 0 ? `
+            <div>
+              <div class="text-xs text-tui-green uppercase mb-1">POSITIVE EFFECTS:</div>
+              <div class="flex flex-wrap gap-1">
+                ${Array.isArray(strain.positive_effects) 
+                  ? strain.positive_effects.slice(0, 6).map(effect => `
+                    <span class="text-xs px-2 py-1 bg-tui-green/20 text-tui-green border border-tui-green/50">
+                      ${effect}
+                    </span>
+                  `).join('')
+                  : strain.positive_effects.split(',').slice(0, 6).map(effect => `
+                    <span class="text-xs px-2 py-1 bg-tui-green/20 text-tui-green border border-tui-green/50">
+                      ${effect.trim()}
+                    </span>
+                  `).join('')
+                }
+              </div>
+            </div>
+          ` : ''}
+          
+          ${strain.negative_effects && strain.negative_effects.length > 0 ? `
+            <div>
+              <div class="text-xs text-tui-red uppercase mb-1">SIDE EFFECTS:</div>
+              <div class="flex flex-wrap gap-1">
+                ${Array.isArray(strain.negative_effects)
+                  ? strain.negative_effects.slice(0, 4).map(effect => `
+                    <span class="text-xs px-2 py-1 bg-tui-red/20 text-tui-red border border-tui-red/50">
+                      ${effect}
+                    </span>
+                  `).join('')
+                  : strain.negative_effects.split(',').slice(0, 4).map(effect => `
+                    <span class="text-xs px-2 py-1 bg-tui-red/20 text-tui-red border border-tui-red/50">
+                      ${effect.trim()}
+                    </span>
+                  `).join('')
+                }
+              </div>
+            </div>
+          ` : ''}
+          
+          ${strain.flavors && strain.flavors.length > 0 ? `
+            <div>
+              <div class="text-xs text-tui-cyan uppercase mb-1">FLAVORS:</div>
+              <div class="flex flex-wrap gap-1">
+                ${Array.isArray(strain.flavors)
+                  ? strain.flavors.slice(0, 5).map(flavor => `
+                    <span class="text-xs px-2 py-1 bg-tui-cyan/20 text-tui-cyan border border-tui-cyan/50">
+                      ${flavor}
+                    </span>
+                  `).join('')
+                  : strain.flavors.split(',').slice(0, 5).map(flavor => `
+                    <span class="text-xs px-2 py-1 bg-tui-cyan/20 text-tui-cyan border border-tui-cyan/50">
+                      ${flavor.trim()}
+                    </span>
+                  `).join('')
+                }
+              </div>
+            </div>
+          ` : ''}
+        </div>
+        
+        <!-- Terpenes & Medical -->
+        ${(strain.terpenes && strain.terpenes.length > 0) || (strain.medical_benefits && strain.medical_benefits.length > 0) ? `
+          <div class="grid grid-cols-1 gap-3 mb-4">
+            ${strain.terpenes && strain.terpenes.length > 0 ? `
+              <div>
+                <div class="text-xs text-tui-magenta uppercase mb-1">TERPENES:</div>
+                <div class="flex flex-wrap gap-1">
+                  ${Array.isArray(strain.terpenes)
+                    ? strain.terpenes.slice(0, 4).map(terpene => `
+                      <span class="text-xs px-2 py-1 bg-purple-500/20 text-purple-400 border border-purple-500/50">
+                        ${terpene}
+                      </span>
+                    `).join('')
+                    : strain.terpenes.split(',').slice(0, 4).map(terpene => `
+                      <span class="text-xs px-2 py-1 bg-purple-500/20 text-purple-400 border border-purple-500/50">
+                        ${terpene.trim()}
+                      </span>
+                    `).join('')
+                  }
+                </div>
+              </div>
+            ` : ''}
+            
+            ${strain.medical_benefits && strain.medical_benefits.length > 0 ? `
+              <div>
+                <div class="text-xs text-tui-blue uppercase mb-1">MEDICAL:</div>
+                <div class="flex flex-wrap gap-1">
+                  ${Array.isArray(strain.medical_benefits)
+                    ? strain.medical_benefits.slice(0, 3).map(benefit => `
+                      <span class="text-xs px-2 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/50">
+                        ${benefit.replace(/\\s*\\(\\d+%\\)/, '')}
+                      </span>
+                    `).join('')
+                    : strain.medical_benefits.split(',').slice(0, 3).map(benefit => `
+                      <span class="text-xs px-2 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/50">
+                        ${benefit.trim().replace(/\\s*\\(\\d+%\\)/, '')}
+                      </span>
+                    `).join('')
+                  }
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        ` : ''}
+        
+        <!-- Genetics -->
+        ${(strain.parents && strain.parents.length > 0) || (strain.children && strain.children.length > 0) ? `
+          <div class="mb-4">
+            <div class="text-xs text-tui-green uppercase mb-2">GENETICS:</div>
+            <div class="tui-panel p-2 space-y-2">
+              ${strain.parents && strain.parents.length > 0 ? `
+                <div>
+                  <span class="text-xs text-tui-yellow uppercase">PARENTS:</span>
+                  <div class="text-xs text-foreground/80 mt-1">
+                    ${Array.isArray(strain.parents) 
+                      ? strain.parents.slice(0, 2).join(' × ')
+                      : strain.parents.split(',').slice(0, 2).map(p => p.trim()).join(' × ')
+                    }
+                  </div>
+                </div>
+              ` : ''}
+              ${strain.children && strain.children.length > 0 ? `
+                <div>
+                  <span class="text-xs text-tui-yellow uppercase">CHILDREN:</span>
+                  <div class="text-xs text-foreground/80 mt-1">
+                    ${Array.isArray(strain.children)
+                      ? strain.children.slice(0, 3).join(', ')
+                      : strain.children.split(',').slice(0, 3).map(c => c.trim()).join(', ')
+                    }
+                  </div>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+        ` : ''}
+        
+        <!-- Actions -->
+        <div class="flex gap-2 mt-4">
+          <button class="tui-button primary flex-1" id="catch-btn">
+            CATCH
+          </button>
+          <button class="tui-button flex-1" id="details-btn">
+            MORE INFO
+          </button>
+        </div>
+      </div>
+    `;
+    
+    detailPane.innerHTML = html;
+    
+    // Re-attach event listeners
+    setupDetailPaneListeners();
+  }
+  
+  function setupDetailPaneListeners() {
+    const catchBtn = document.getElementById('catch-btn');
+    const detailsBtn = document.getElementById('details-btn');
+    
+    if (catchBtn && currentStrain) {
+      catchBtn.addEventListener('click', () => {
+        toggleCatch(currentStrain);
+      });
+    }
+    
+    if (detailsBtn && currentStrain) {
+      detailsBtn.addEventListener('click', () => {
+        window.location.href = `/strains/${currentStrain.url}`;
+      });
+    }
+  }
+  
+  function toggleCatch(strain: any) {
+    const caughtStrains = JSON.parse(localStorage.getItem('caught-strains') || '[]');
+    const isCaught = caughtStrains.includes(strain.name);
+    
+    if (isCaught) {
+      // Remove from caught
+      const index = caughtStrains.indexOf(strain.name);
+      if (index > -1) {
+        caughtStrains.splice(index, 1);
+      }
+    } else {
+      // Add to caught
+      caughtStrains.push(strain.name);
+    }
+    
+    localStorage.setItem('caught-strains', JSON.stringify(caughtStrains));
+    
+    // Update button text
+    const catchBtn = document.getElementById('catch-btn');
+    if (catchBtn) {
+      catchBtn.textContent = isCaught ? 'CATCH' : 'RELEASE';
+    }
+    
+    // Update strain sprite indicator
+    const strainSprite = document.querySelector(`[data-strain="${strain.name}"]`);
+    if (strainSprite) {
+      const indicator = strainSprite.querySelector('.bg-tui-red');
+      if (!isCaught && !indicator) {
+        const newIndicator = document.createElement('div');
+        newIndicator.className = 'absolute top-1 right-1 w-2 h-2 bg-tui-red rounded-full';
+        strainSprite.appendChild(newIndicator);
+      } else if (isCaught && indicator) {
+        indicator.remove();
+      }
+    }
+    
+    // Update stats
+    window.dispatchEvent(new CustomEvent('strain-stats-updated'));
+  }
+  
+  // Initialize detail pane listeners on load
+  document.addEventListener('DOMContentLoaded', setupDetailPaneListeners);
+</script>
+
+<style>
+  .strain-info {
+    animation: fadeIn 0.2s ease;
+    flex: 1;
+    min-height: 0;
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* Mobile adjustments */
+  @media (max-width: 768px) {
+    .strain-detail-image {
+      width: 96px;
+      height: 96px;
+    }
+    
+    .strain-detail-pane {
+      max-height: 280px;
+    }
+  }
+</style>

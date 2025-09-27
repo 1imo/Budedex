@@ -69,6 +69,10 @@ export class StrainService {
         return { strains, total, pagination };
     }
 
+    async searchExact(query: string): Promise<StrainComplete | null> {
+        return await this.strainRepository.searchExact(query);
+    }
+
     async createStrain(strainData: CreateStrainRequest): Promise<Strain> {
         // Check if strain already exists
         const existingStrain = await this.strainRepository.getByName(strainData.name);

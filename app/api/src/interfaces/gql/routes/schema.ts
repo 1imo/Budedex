@@ -1,5 +1,6 @@
 export const typeDefs = `#graphql
 type Strain {
+  strain_id: Int
   name: String!
   url: String
   type: String!
@@ -98,6 +99,7 @@ type Strain {
     strains(page: Int! = 1, limit: Int! = 20): PaginatedStrains!
     strain(name: String!): Strain
     searchStrains(query: String!, page: Int! = 1, limit: Int! = 20): PaginatedStrains!
+    searchExact(query: String!): Strain
     strainsByCategory(category: String!, page: Int! = 1, limit: Int! = 20): PaginatedStrains!
     strainsByEffect(effect: String!, page: Int! = 1, limit: Int! = 20): PaginatedStrains!
     leaderboard(page: Int! = 1, limit: Int! = 20): LeaderboardResult!

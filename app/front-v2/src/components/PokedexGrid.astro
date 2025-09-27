@@ -1,0 +1,509 @@
+---
+interface Strain {
+  name: string;
+  url: string;
+  type: string;
+  image_path?: string;
+  image_url?: string;
+  category: string;
+}
+
+interface Props {
+  strains: Strain[];
+  initialPage?: number;
+  totalPages?: number;
+  apiUrl?: string;
+}
+
+const { strains = [], initialPage = 1, totalPages = 1, apiUrl = 'http://localhost:4002' } = Astro.props;
+
+// Calculate grid size based on strain count - responsive columns
+const gridCols = 10; // 10 columns for desktop, responsive via CSS
+---
+
+<div 
+  class="pokedex-grid tui-scrollbar"
+  id="strain-grid"
+  data-initial-page={initialPage}
+  data-total-pages={totalPages}
+  data-api-url={apiUrl}
+>
+      {strains.map((strain: Strain, index: number) => {
+        return (
+          <div
+            class="strain-sprite"
+            data-strain={strain.name}
+            data-strain-data={JSON.stringify(strain)}
+            data-strain-index={index}
+          >
+            <img
+              id={`strain-img-${index}`}
+              src={strain.image_url || strain.image_path || '/placeholder.png'}
+              alt={strain.name}
+              loading="lazy"
+            />
+            <div class="strain-id">#{index + 1}</div>
+          </div>
+        );
+      })}
+  <!-- Loading spinner for pagination -->
+  <div id="pagination-loading" class="loading-spinner hidden">
+    <div class="tui-container p-3 text-center">
+      <div class="text-tui-green text-xs uppercase tracking-wider">Loading more strains...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Pagination state
+  let paginationState = {
+    currentPage: 1,
+    totalPages: 1,
+    loadedPages: new Set([1]),
+    isLoading: false,
+    strainCounter: 0
+  };
+
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('🎮 PokedexGrid loaded');
+    
+    // Initialize pagination state from grid data
+    const grid = document.getElementById('strain-grid');
+    let apiUrl = 'http://localhost:4002';
+    if (grid) {
+      paginationState.currentPage = parseInt(grid.dataset.initialPage || '1');
+      paginationState.totalPages = parseInt(grid.dataset.totalPages || '1');
+      paginationState.loadedPages = new Set([paginationState.currentPage]);
+      paginationState.strainCounter = document.querySelectorAll('.strain-sprite').length;
+      apiUrl = grid.dataset.apiUrl || 'http://localhost:4002';
+      
+      console.log('📊 Pagination initialized:', paginationState, 'API URL:', apiUrl);
+    }
+    
+    // Function to apply ghost effect to unseen images only
+    function enforceGhostEffect() {
+      const allImages = document.querySelectorAll(`
+        img[id^="strain-img-"],
+        .pokedex-grid img, 
+        .strain-sprite img, 
+        .strain-image, 
+        img[loading="lazy"]
+      `);
+      
+      allImages.forEach((img, index) => {
+        const htmlImg = img as HTMLImageElement;
+        
+        // Check if this strain is seen by looking at the parent element
+        const strainElement = htmlImg.closest('.strain-sprite');
+        if (strainElement) {
+          const strainName = strainElement.getAttribute('data-strain');
+          
+          // Get seen strains from localStorage
+          const seenStrains = JSON.parse(localStorage.getItem('seen-strains') || '[]');
+          const isSeen = seenStrains.includes(strainName);
+          
+          if (isSeen) {
+            // Remove ghost effect for seen strains
+            htmlImg.style.removeProperty('filter');
+            htmlImg.style.removeProperty('opacity');
+            htmlImg.classList.remove('force-ghost');
+            htmlImg.classList.add('strain-seen');
+          } else {
+            // Apply ghost effect for unseen strains
+            htmlImg.style.setProperty('filter', 'grayscale(100%) brightness(0.54) contrast(40)', 'important');
+            htmlImg.style.setProperty('opacity', '0.6', 'important');
+            htmlImg.style.setProperty('transition', 'none', 'important');
+            htmlImg.style.setProperty('background', 'white', 'important');
+            htmlImg.classList.add('force-ghost');
+            htmlImg.classList.remove('strain-seen');
+          }
+        }
+      });
+      
+      const seenCount = document.querySelectorAll('.strain-seen').length;
+      const ghostCount = document.querySelectorAll('.force-ghost').length;
+      console.log(`�️ STRAIN STATE: ${seenCount} seen, ${ghostCount} ghosted`);
+    }
+
+    // Setup pagination and lazy loading
+    setupLazyLoading();
+    
+    // Load second page immediately after initial load
+    setTimeout(() => {
+      if (paginationState.totalPages > 1 && !paginationState.loadedPages.has(2)) {
+        console.log('🔄 Loading second page immediately...');
+        loadPage(2);
+      }
+    }, 1000);
+
+    // Apply ghost effect periodically
+    enforceGhostEffect();
+    setInterval(enforceGhostEffect, 1000);
+
+    // Handle strain clicks
+    document.addEventListener('click', (e) => {
+      const strainSprite = (e.target as HTMLElement).closest('.strain-sprite');
+      if (strainSprite) {
+        const strainData = strainSprite.getAttribute('data-strain-data');
+        if (strainData) {
+          try {
+            const strain = JSON.parse(strainData);
+            // Use strain_id from database as the strain number
+            strain.strainNumber = strain.strain_id || 'XXX';
+            // Dispatch custom event for parent components to handle
+            const event = new CustomEvent('strain-selected', { 
+              detail: strain,
+              bubbles: true 
+            });
+            strainSprite.dispatchEvent(event);
+          } catch (error) {
+            console.error('Error parsing strain data:', error);
+          }
+        }
+      }
+    });
+  });
+
+  // Setup lazy loading with scroll detection
+  function setupLazyLoading() {
+    // The scrollable element is the grid itself
+    const scrollElement = document.querySelector('.pokedex-grid') || document.getElementById('strain-grid');
+    if (!scrollElement) {
+      console.warn('Scroll element not found for lazy loading');
+      return;
+    }
+    
+    let scrollTimeout;
+    scrollElement.addEventListener('scroll', () => {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        const { scrollTop, scrollHeight, clientHeight } = scrollElement;
+        const scrollPercentage = (scrollTop + clientHeight) / scrollHeight;
+        
+        console.log(`📊 Scroll: ${Math.round(scrollPercentage * 100)}%, Pages loaded: ${paginationState.loadedPages.size}/${paginationState.totalPages}`);
+        
+        // Load next page when 70% scrolled to the end (more aggressive)
+        if (scrollPercentage > 0.7 && !paginationState.isLoading) {
+          const nextPage = Math.max(...paginationState.loadedPages) + 1;
+          console.log(`🎯 Scroll trigger: ${Math.round(scrollPercentage * 100)}%, next page: ${nextPage}, total: ${paginationState.totalPages}`);
+          
+          if (nextPage <= paginationState.totalPages) {
+            console.log(`🔄 Triggering lazy load for page ${nextPage}`);
+            loadPage(nextPage);
+          } else {
+            console.log('📝 All pages loaded');
+          }
+        }
+      }, 100);
+    });
+    
+    console.log('✅ Lazy loading setup complete');
+  }
+
+  // Load a specific page of strains
+  async function loadPage(pageNumber) {
+    if (paginationState.loadedPages.has(pageNumber) || paginationState.isLoading) {
+      console.log(`⚠️ Page ${pageNumber} already loaded or loading in progress`);
+      return;
+    }
+    
+    console.log(`🔄 Loading page ${pageNumber}...`);
+    setLoadingState(true);
+    
+    try {
+      const grid = document.getElementById('strain-grid');
+      const currentApiUrl = grid?.dataset.apiUrl || 'http://localhost:4002';
+      console.log(`🔗 API Request to: ${currentApiUrl}/api/gql`);
+      
+      const response = await fetch(`${currentApiUrl}/api/gql`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `
+            query GetStrains($page: Int!, $limit: Int!) {
+              strains(page: $page, limit: $limit) {
+                strains {
+                  name url type thc cbd rating review_count top_effect category 
+                  image_path image_url description aliases positive_effects 
+                  negative_effects flavors terpenes medical_benefits parents children
+                }
+                pageInfo { hasNextPage hasPreviousPage currentPage totalPages total }
+              }
+            }
+          `,
+          variables: { page: pageNumber, limit: 100 }
+        })
+      });
+      
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      
+      const data = await response.json();
+      if (data.errors) throw new Error(data.errors[0].message);
+      
+      const newStrains = data.data.strains.strains;
+      const pageInfo = data.data.strains.pageInfo;
+      
+      appendStrainsToGrid(newStrains);
+      paginationState.loadedPages.add(pageNumber);
+      paginationState.totalPages = pageInfo.totalPages;
+      paginationState.currentPage = Math.max(paginationState.currentPage, pageNumber);
+      
+      console.log(`✅ Loaded page ${pageNumber} with ${newStrains.length} strains. Total loaded: ${paginationState.loadedPages.size}/${paginationState.totalPages} pages`);
+    } catch (error) {
+      console.error(`❌ Failed to load page ${pageNumber}:`, error);
+      // Show error to user
+      showError(`Failed to load page ${pageNumber}: ${error.message}`);
+    } finally {
+      setLoadingState(false);
+    }
+  }
+
+  // Add new strains to the grid
+  function appendStrainsToGrid(strains) {
+    const grid = document.getElementById('strain-grid');
+    if (!grid) {
+      console.error('Strain grid not found');
+      return;
+    }
+    
+    strains.forEach(strain => {
+      const strainDiv = document.createElement('div');
+      strainDiv.className = 'strain-sprite';
+      strainDiv.dataset.strain = strain.name;
+      strainDiv.dataset.strainData = JSON.stringify(strain);
+      strainDiv.dataset.strainIndex = paginationState.strainCounter.toString();
+      
+      // Copy the Astro scoping attributes from existing elements
+      const existingStrain = document.querySelector('.strain-sprite');
+      if (existingStrain) {
+        // Copy all data-astro-* attributes
+        Array.from(existingStrain.attributes).forEach(attr => {
+          if (attr.name.startsWith('data-astro-')) {
+            strainDiv.setAttribute(attr.name, attr.value);
+          }
+        });
+      }
+      
+      const img = document.createElement('img');
+      img.id = `strain-img-${paginationState.strainCounter}`;
+      img.src = strain.image_url || strain.image_path || '/placeholder.png';
+      img.alt = strain.name;
+      img.className = 'force-ghost';
+      img.loading = 'lazy';
+      
+      // Copy Astro attributes to img as well
+      if (existingStrain) {
+        const existingImg = existingStrain.querySelector('img');
+        if (existingImg) {
+          Array.from(existingImg.attributes).forEach(attr => {
+            if (attr.name.startsWith('data-astro-')) {
+              img.setAttribute(attr.name, attr.value);
+            }
+          });
+        }
+      }
+      
+      // Apply ghost effect immediately to new images
+      img.style.setProperty('filter', 'grayscale(100%) brightness(0.54) contrast(40)', 'important');
+      img.style.setProperty('opacity', '0.6', 'important');
+      img.style.setProperty('transition', 'none', 'important');
+      img.style.setProperty('background', 'white', 'important');
+      
+      const idDiv = document.createElement('div');
+      idDiv.className = 'strain-id';
+      idDiv.textContent = `#${paginationState.strainCounter + 1}`;
+      
+      // Copy Astro attributes to idDiv as well
+      if (existingStrain) {
+        const existingIdDiv = existingStrain.querySelector('.strain-id');
+        if (existingIdDiv) {
+          Array.from(existingIdDiv.attributes).forEach(attr => {
+            if (attr.name.startsWith('data-astro-')) {
+              idDiv.setAttribute(attr.name, attr.value);
+            }
+          });
+        }
+      }
+      
+      strainDiv.appendChild(img);
+      strainDiv.appendChild(idDiv);
+      
+      console.log(`📝 Added strain #${paginationState.strainCounter + 1}: ${strain.name}`);
+      
+      // Add click listener
+      strainDiv.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLElement;
+        const strainDataStr = target.dataset.strainData;
+        
+        if (strainDataStr) {
+          try {
+            const strainData = JSON.parse(strainDataStr);
+            
+            // Use strain_id from database as the strain number
+            strainData.strainNumber = strainData.strain_id || 'XXX';
+            
+            // Remove previous selection
+            document.querySelectorAll('.strain-sprite.selected').forEach(el => {
+              el.classList.remove('selected');
+            });
+            
+            // Add selection to clicked strain
+            target.classList.add('selected');
+            
+            // Dispatch selection event
+            const event = new CustomEvent('strain-selected', {
+              detail: strainData,
+              bubbles: true
+            });
+            target.dispatchEvent(event);
+          } catch (error) {
+            console.error('Error parsing strain data:', error);
+          }
+        }
+      });
+      
+      grid.appendChild(strainDiv);
+      paginationState.strainCounter++;
+    });
+    
+    console.log(`✅ Added ${strains.length} strains to grid. Total strains: ${paginationState.strainCounter}`);
+  }
+
+  // Manage loading state
+  function setLoadingState(isLoading) {
+    paginationState.isLoading = isLoading;
+    const loadingIndicator = document.getElementById('pagination-loading');
+    if (loadingIndicator) {
+      loadingIndicator.classList.toggle('hidden', !isLoading);
+    }
+  }
+
+  // Show error message
+  function showError(message) {
+    console.error(message);
+    // You could add a toast notification here
+  }
+
+  // Debug function - expose to global scope for manual testing
+  window.loadNextPage = () => {
+    const nextPage = Math.max(...paginationState.loadedPages) + 1;
+    if (nextPage <= paginationState.totalPages && !paginationState.isLoading) {
+      console.log(`🔧 Manual trigger: Loading page ${nextPage}`);
+      loadPage(nextPage);
+    } else {
+      console.log(`🔧 Cannot load next page. Next: ${nextPage}, Total: ${paginationState.totalPages}, Loading: ${paginationState.isLoading}`);
+    }
+  };
+
+  window.getPaginationState = () => paginationState;
+</script>
+
+<style>
+  /* Ghost effect for unseen images */
+  .force-ghost {
+    filter: grayscale(100%) brightness(0.54) contrast(40) !important;
+    opacity: 0.6 !important;
+    transition: none !important;
+    background: white !important;
+  }
+  
+  /* Normal appearance for seen images */
+  .strain-seen {
+    filter: none !important;
+    opacity: 1 !important;
+    transition: none !important;
+    background: white !important;
+  }
+
+  .pokedex-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 0;
+    overflow-y: auto;
+    background: transparent;
+    padding: 0;
+    width: 100%;
+  }
+
+  .strain-sprite,
+  .pokedex-grid > .strain-sprite {
+    aspect-ratio: 1 / 1;
+    width: 100% !important;
+    height: 0 !important;
+    padding-bottom: 100% !important;
+    background: white !important;
+    border: 2px solid black !important;
+    border-bottom: 4px solid black !important;
+    position: relative !important;
+    cursor: pointer !important;
+    transition: border-color 0.1s !important;
+    overflow: hidden !important;
+  }
+
+  .strain-sprite:hover,
+  .pokedex-grid > .strain-sprite:hover {
+    border-color: #666 !important;
+    border-bottom-color: #666 !important;
+  }
+
+  .strain-sprite img,
+  .pokedex-grid > .strain-sprite img {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+  }
+
+  .strain-id,
+  .pokedex-grid .strain-id,
+  .strain-sprite .strain-id {
+    position: absolute !important;
+    bottom: 2px !important;
+    right: 2px !important;
+    background: white !important;
+    color: #333 !important;
+    font-size: 8px !important;
+    padding: 1px 2px !important;
+    border: 1px solid #333 !important;
+    line-height: 1 !important;
+    z-index: 10 !important;
+    display: block !important;
+  }
+
+  /* Loading spinner styles */
+  .loading-spinner {
+    margin-top: 16px;
+    margin-bottom: 16px;
+  }
+  
+  .loading-spinner .tui-container {
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+  
+  /* Responsive grid columns */
+  @media (max-width: 1024px) {
+    .pokedex-grid {
+      grid-template-columns: repeat(8, 1fr) !important;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .pokedex-grid {
+      grid-template-columns: repeat(6, 1fr) !important;
+    }
+  }
+  
+  @media (max-width: 600px) {
+    .pokedex-grid {
+      grid-template-columns: repeat(5, 1fr) !important;
+    }
+  }
+</style>

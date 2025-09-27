@@ -1,0 +1,602 @@
+---
+import Layout from '../components/Layout.astro';
+import TUIHeader from '../components/TUIHeader.astro';
+import PokedexGrid from '../components/PokedexGrid.astro';
+import StrainDetailPane from '../components/StrainDetailPane.astro';
+import { getStrains } from '../services/graphql';
+
+// Get page number from URL params
+const url = new URL(Astro.request.url);
+const initialPage = parseInt(url.searchParams.get('page') || '1');
+const limit = 100; // API max limit is 100
+
+// Fetch initial strains data
+let initialStrainsData = null;
+let error = null;
+
+try {
+  console.log(`🔄 Fetching initial strains: page ${initialPage}, limit ${limit}`);
+  initialStrainsData = await getStrains(initialPage, limit);
+  console.log(`✅ Loaded ${initialStrainsData?.strains?.strains?.length || 0} initial strains`);
+} catch (e) {
+  const errorMessage = e instanceof Error ? e.message : 'Failed to fetch strains';
+  error = errorMessage;
+  console.error('❌ Failed to load initial strains:', error, e);
+}
+
+const initialStrains = initialStrainsData?.strains?.strains || [];
+const totalPages = initialStrainsData?.strains?.pageInfo?.totalPages || 1;
+const totalStrains = initialStrainsData?.strains?.pageInfo?.total || 0;
+const apiUrl = import.meta.env.PUBLIC_API_URL || 'http://localhost:4002';
+---
+
+<Layout title="Budedex V2 - Pokédex Interface">
+  <div class="pokedex-layout">
+    <!-- TUI Header -->
+    <TUIHeader />
+    
+    <!-- Error Display -->
+    {error && (
+      <div class="fixed top-20 left-1/2 transform -translate-x-1/2 z-50">
+        <div class="tui-container bg-destructive text-destructive-foreground p-4">
+          <div class="text-center">
+            <div class="text-sm uppercase tracking-wider mb-2">SYSTEM ERROR</div>
+            <div class="text-xs">{error}</div>
+          </div>
+        </div>
+      </div>
+    )}
+    
+    <!-- Main Content Grid -->
+    <PokedexGrid strains={initialStrains} initialPage={initialPage} totalPages={totalPages} apiUrl={apiUrl} />
+    
+    <!-- Detail Pane -->
+    <StrainDetailPane />
+    
+    <!-- Loading Indicator -->
+    <div id="loading-indicator" class="fixed bottom-4 right-4 tui-container p-2 hidden">
+      <div class="text-xs text-tui-green uppercase">LOADING...</div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  // Global state management
+  let appState = {
+    strains: [],
+    selectedStrain: null,
+    seenStrains: [],
+    caughtStrains: [],
+    searchQuery: '',
+    isLoading: false,
+    currentPage: 1,
+    totalPages: 1,
+    totalStrains: 0,
+    loadedPages: new Set([1])
+  };
+  
+  // Initialize with server data
+  appState.currentPage = parseInt('${initialPage}');
+  appState.totalPages = parseInt('${totalPages}');
+  appState.totalStrains = parseInt('${totalStrains}');
+  appState.loadedPages = new Set([parseInt('${initialPage}')]);
+  
+  // Initialize app
+  document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🎮 Budedex V2 Initialized');
+    
+    // Load user data from localStorage
+    loadUserData();
+    
+    // Setup keyboard shortcuts
+    setupKeyboardShortcuts();
+    
+    // Show welcome message
+    showWelcomeMessage();
+    
+    // Auto-select first strain if none selected
+    setTimeout(() => {
+      if (!appState.selectedStrain && appState.strains.length > 0) {
+        const firstSeenStrain = appState.strains.find(strain => 
+          appState.seenStrains.includes(strain.name)
+        );
+        if (firstSeenStrain) {
+          selectStrain(firstSeenStrain);
+        }
+      }
+    }, 1000);
+    
+    // Setup lazy loading and prefetch next page
+    setupLazyLoading();
+    prefetchNextPage();
+    
+    // Apply initial seen strain styling
+    updateAllStrainVisualStates();
+  });
+  
+  function loadUserData() {
+    try {
+      appState.seenStrains = JSON.parse(localStorage.getItem('seen-strains') || '[]');
+      appState.caughtStrains = JSON.parse(localStorage.getItem('caught-strains') || '[]');
+      
+      // If no seen strains, mark first few as seen for demo
+      if (appState.seenStrains.length === 0) {
+        const strainsToMark = ['ak-47', 'blue-dream', 'og-kush', 'sour-diesel', 'white-widow'];
+        appState.seenStrains = strainsToMark;
+        localStorage.setItem('seen-strains', JSON.stringify(strainsToMark));
+      }
+      
+      console.log(`📊 Loaded user data: ${appState.seenStrains.length} seen, ${appState.caughtStrains.length} caught`);
+    } catch (error) {
+      console.error('Failed to load user data:', error);
+    }
+  }
+  
+  // Update visual state of a single strain
+  function updateStrainVisualState(strainName, isSeen) {
+    const strainElements = document.querySelectorAll(`[data-strain="${strainName}"]`);
+    strainElements.forEach(element => {
+      const img = element.querySelector('img');
+      if (img) {
+        if (isSeen) {
+          // Remove ghost effect for seen strains
+          img.style.removeProperty('filter');
+          img.style.removeProperty('opacity');
+          img.classList.remove('force-ghost');
+          img.classList.add('strain-seen');
+        } else {
+          // Apply ghost effect for unseen strains
+          img.style.setProperty('filter', 'grayscale(100%) brightness(0.54) contrast(40)', 'important');
+          img.style.setProperty('opacity', '0.6', 'important');
+          img.classList.add('force-ghost');
+          img.classList.remove('strain-seen');
+        }
+      }
+    });
+  }
+  
+  // Update visual states for all strains based on seen status
+  function updateAllStrainVisualStates() {
+    document.querySelectorAll('.strain-sprite').forEach(element => {
+      const strainName = element.getAttribute('data-strain');
+      if (strainName) {
+        const isSeen = appState.seenStrains.includes(strainName);
+        updateStrainVisualState(strainName, isSeen);
+      }
+    });
+    console.log(`👁️ Updated visual states for ${document.querySelectorAll('.strain-sprite').length} strains`);
+  }
+  
+  // Get strain number from grid position
+  function getStrainNumber(strainName) {
+    const strainElements = document.querySelectorAll('.strain-sprite');
+    for (let i = 0; i < strainElements.length; i++) {
+      const element = strainElements[i];
+      if (element.getAttribute('data-strain') === strainName) {
+        return i + 1; // 1-based indexing
+      }
+    }
+    return null;
+  }
+  
+  function selectStrain(strain) {
+    appState.selectedStrain = strain;
+    window.dispatchEvent(new CustomEvent('strain-selected', {
+      detail: { strain }
+    }));
+  }
+  
+  function setupKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+      // Focus search on '/' key
+      if (e.key === '/' && e.target.tagName !== 'INPUT') {
+        e.preventDefault();
+        const searchInput = document.getElementById('strain-search');
+        if (searchInput) {
+          searchInput.focus();
+        }
+      }
+      
+      // Escape to clear search
+      if (e.key === 'Escape') {
+        const searchInput = document.getElementById('strain-search');
+        if (searchInput) {
+          searchInput.value = '';
+          searchInput.blur();
+          window.dispatchEvent(new CustomEvent('strain-search-live', {
+            detail: { query: '' }
+          }));
+        }
+      }
+      
+      // Arrow keys for strain navigation
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        navigateStrains(e.key);
+      }
+    });
+  }
+  
+  function navigateStrains(direction) {
+    const strainSprites = Array.from(document.querySelectorAll('.strain-sprite:not([style*="display: none"])'));
+    const currentSelected = document.querySelector('.strain-sprite.selected');
+    
+    if (!currentSelected || strainSprites.length === 0) return;
+    
+    const currentIndex = strainSprites.indexOf(currentSelected);
+    let newIndex = currentIndex;
+    
+    const gridCols = Math.floor(document.querySelector('.pokedex-grid').offsetWidth / 65); // 64px + 1px gap
+    
+    switch (direction) {
+      case 'ArrowLeft':
+        newIndex = Math.max(0, currentIndex - 1);
+        break;
+      case 'ArrowRight':
+        newIndex = Math.min(strainSprites.length - 1, currentIndex + 1);
+        break;
+      case 'ArrowUp':
+        newIndex = Math.max(0, currentIndex - gridCols);
+        break;
+      case 'ArrowDown':
+        newIndex = Math.min(strainSprites.length - 1, currentIndex + gridCols);
+        break;
+    }
+    
+    if (newIndex !== currentIndex && strainSprites[newIndex]) {
+      strainSprites[newIndex].click();
+      strainSprites[newIndex].scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center' 
+      });
+    }
+  }
+  
+  function showWelcomeMessage() {
+    const welcomeShown = localStorage.getItem('budedex-v2-welcome');
+    if (!welcomeShown) {
+      setTimeout(() => {
+        alert('🎮 WELCOME TO BUDEDEX V2!\n\n' +
+              'Use the Pokédex-style interface to explore strains:\n' +
+              '• Click strain images to view details\n' +
+              '• Search with the top bar (press / to focus)\n' +
+              '• Use arrow keys to navigate\n' +
+              '• Catch strains to add them to your collection\n\n' +
+              'Press ESC to clear search, / to focus search');
+        localStorage.setItem('budedex-v2-welcome', 'true');
+      }, 1500);
+    }
+  }
+  
+  // Loading state management
+  function setLoading(isLoading) {
+    appState.isLoading = isLoading;
+    const indicator = document.getElementById('loading-indicator');
+    if (indicator) {
+      indicator.classList.toggle('hidden', !isLoading);
+    }
+  }
+  
+  // Fetch additional page of strains
+  async function fetchPage(pageNumber) {
+    if (appState.loadedPages.has(pageNumber) || appState.isLoading) {
+      return;
+    }
+    
+    console.log(`🔄 Fetching page ${pageNumber}...`);
+    setLoading(true);
+    
+    try {
+      const response = await fetch('/api/gql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `
+            query GetStrains($page: Int!, $limit: Int!) {
+              strains(page: $page, limit: $limit) {
+                strains {
+                  name url type thc cbd rating review_count top_effect category 
+                  image_path image_url description aliases positive_effects 
+                  negative_effects flavors terpenes medical_benefits parents children
+                }
+                pageInfo { hasNextPage hasPreviousPage currentPage totalPages total }
+              }
+            }
+          `,
+          variables: { page: pageNumber, limit: 100 }
+        })
+      });
+      
+      if (!response.ok) throw new Error('Failed to fetch page');
+      
+      const data = await response.json();
+      if (data.errors) throw new Error(data.errors[0].message);
+      
+      const newStrains = data.data.strains.strains;
+      const pageInfo = data.data.strains.pageInfo;
+      
+      appendStrainsToGrid(newStrains);
+      appState.loadedPages.add(pageNumber);
+      appState.totalPages = pageInfo.totalPages;
+      appState.currentPage = Math.max(appState.currentPage, pageNumber);
+      
+      console.log(`✅ Loaded page ${pageNumber} with ${newStrains.length} strains. Total pages: ${appState.totalPages}`);
+    } catch (error) {
+      console.error(`❌ Failed to load page ${pageNumber}:`, error);
+    } finally {
+      setLoading(false);
+    }
+  }
+  
+  // Add strains to the grid dynamically
+  function appendStrainsToGrid(strains) {
+    const grid = document.querySelector('.pokedex-grid');
+    if (!grid) return;
+    
+    strains.forEach(strain => {
+      const strainDiv = document.createElement('div');
+      strainDiv.className = 'strain-sprite'; // Will be ghosted by CSS
+      strainDiv.dataset.strain = strain.name;
+      strainDiv.dataset.strainData = JSON.stringify(strain);
+      strainDiv.title = '???';
+      
+      const img = document.createElement('img');
+      img.src = strain.image_url || `/api/images/${strain.image_path}`;
+      img.alt = '???';
+      img.className = 'w-full h-full object-cover';
+      img.loading = 'lazy';
+      
+      strainDiv.appendChild(img);
+      
+      // Add click listener
+      strainDiv.addEventListener('click', (e) => {
+        const target = e.currentTarget;
+        const strainName = target.dataset.strain;
+        const strainDataStr = target.dataset.strainData;
+        
+        if (strainName && strainDataStr) {
+          const strainData = JSON.parse(strainDataStr);
+          
+          // Remove previous selection
+          document.querySelectorAll('.strain-sprite.selected').forEach(el => {
+            el.classList.remove('selected');
+          });
+          
+          // Add selection to clicked strain
+          target.classList.add('selected');
+          
+          // Dispatch selection event
+          window.dispatchEvent(new CustomEvent('strain-selected', {
+            detail: { strain: strainData }
+          }));
+          
+          // All strains stay as ghosts - no state changes
+        }
+      });
+      
+      grid.appendChild(strainDiv);
+    });
+    
+    // Debug: Force strain-sprite class on all grid children after adding
+    const allGridChildren = Array.from(grid.children);
+    allGridChildren.forEach((child, i) => {
+      if (!child.classList.contains('strain-sprite')) {
+        console.log(`⚠️ Dynamic child ${i} missing strain-sprite class, adding it`);
+        child.classList.add('strain-sprite');
+      }
+    });
+    
+    console.log(`✅ Added ${strains.length} strains. Grid now has ${allGridChildren.length} total children`);
+  }
+  
+  // Setup lazy loading with scroll detection
+  function setupLazyLoading() {
+    const gridArea = document.querySelector('.pokedex-grid');
+    if (!gridArea) {
+      console.warn('Grid area not found for lazy loading');
+      return;
+    }
+    
+    let scrollTimeout;
+    gridArea.addEventListener('scroll', () => {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        const { scrollTop, scrollHeight, clientHeight } = gridArea;
+        const scrollPercentage = (scrollTop + clientHeight) / scrollHeight;
+        
+        console.log(`📊 Scroll: ${Math.round(scrollPercentage * 100)}%, Pages loaded: ${appState.loadedPages.size}`);
+        
+        // Load next page when 80% scrolled
+        if (scrollPercentage > 0.8 && !appState.isLoading) {
+          const nextPage = Math.max(...appState.loadedPages) + 1;
+          if (nextPage <= appState.totalPages) {
+            console.log(`🔄 Triggering fetch for page ${nextPage}`);
+            fetchPage(nextPage);
+          } else {
+            console.log('📝 All pages loaded');
+          }
+        }
+      }, 100);
+    });
+    
+    console.log('✅ Lazy loading setup complete');
+  }
+  
+  // Prefetch next page immediately
+  function prefetchNextPage() {
+    setTimeout(() => {
+      const nextPage = appState.currentPage + 1;
+      if (nextPage <= appState.totalPages) {
+        console.log('🔄 Prefetching next page...');
+        fetchPage(nextPage);
+      }
+    }, 2000); // Wait 2 seconds after page load
+  }
+  
+  // Listen for events
+  window.addEventListener('strain-selected', (e) => {
+    appState.selectedStrain = e.detail.strain;
+  });
+  
+  window.addEventListener('strain-search', async (e) => {
+    const query = e.detail.query;
+    console.log(`🔍 Exact search for: "${query}"`);
+    
+    try {
+      setLoading(true);
+      
+      // Import searchExact dynamically
+      const { searchExact } = await import('../services/graphql');
+      const result = await searchExact(query);
+      
+      if (result.searchExact) {
+        const strain = result.searchExact;
+        console.log(`✅ Found exact match: ${strain.name}`);
+        
+        // Use the strain_id from the database as the strain number
+        strain.strainNumber = strain.strain_id || 'XXX';
+        
+        // Mark strain as seen
+        if (!appState.seenStrains.includes(strain.name)) {
+          appState.seenStrains.push(strain.name);
+          localStorage.setItem('seen-strains', JSON.stringify(appState.seenStrains));
+          
+          // Update seen counter
+          const seenCountEl = document.getElementById('seen-count');
+          if (seenCountEl) {
+            seenCountEl.textContent = appState.seenStrains.length.toString().padStart(4, '0');
+          }
+          
+          // Update visual state of strain in grid if it exists
+          updateStrainVisualState(strain.name, true);
+        }
+        
+        // Update selected strain and show in sidebar
+        appState.selectedStrain = strain;
+        window.dispatchEvent(new CustomEvent('strain-selected', {
+          detail: { strain }
+        }));
+        
+        // Clear search input
+        const searchInput = document.getElementById('strain-search') as HTMLInputElement;
+        if (searchInput) {
+          searchInput.value = '';
+        }
+        
+      } else {
+        console.log(`❌ No exact match found for: "${query}"`);
+        
+        // Show error message
+        const errorDiv = document.getElementById('search-error') || document.createElement('div');
+        errorDiv.id = 'search-error';
+        errorDiv.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 z-50';
+        errorDiv.innerHTML = `
+          <div class="tui-container bg-destructive text-destructive-foreground p-4">
+            <div class="text-center">
+              <div class="text-sm uppercase tracking-wider mb-2">STRAIN NOT FOUND</div>
+              <div class="text-xs">"${query}" - Try a different name or alias</div>
+            </div>
+          </div>
+        `;
+        
+        if (!document.getElementById('search-error')) {
+          document.body.appendChild(errorDiv);
+        }
+        
+        // Remove error after 3 seconds
+        setTimeout(() => {
+          if (errorDiv.parentNode) {
+            errorDiv.parentNode.removeChild(errorDiv);
+          }
+        }, 3000);
+      }
+    } catch (error) {
+      console.error('❌ Search failed:', error);
+      
+      // Show error message
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 z-50';
+      errorDiv.innerHTML = `
+        <div class="tui-container bg-destructive text-destructive-foreground p-4">
+          <div class="text-center">
+            <div class="text-sm uppercase tracking-wider mb-2">SEARCH ERROR</div>
+            <div class="text-xs">Failed to search for "${query}"</div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(errorDiv);
+      
+      setTimeout(() => {
+        if (errorDiv.parentNode) {
+          errorDiv.parentNode.removeChild(errorDiv);
+        }
+      }, 3000);
+    } finally {
+      setLoading(false);
+    }
+  });
+  
+  window.addEventListener('strain-search-live', (e) => {
+    appState.searchQuery = e.detail.query;
+  });
+  
+  // Expose global functions for debugging
+  window.budedexDebug = {
+    getState: () => appState,
+    clearUserData: () => {
+      localStorage.removeItem('seen-strains');
+      localStorage.removeItem('caught-strains');
+      localStorage.removeItem('budedex-v2-welcome');
+      location.reload();
+    },
+    markAllSeen: () => {
+      const allStrains = Array.from(document.querySelectorAll('.strain-sprite')).map(el => el.dataset.strain);
+      localStorage.setItem('seen-strains', JSON.stringify(allStrains));
+      location.reload();
+    }
+  };
+  
+  console.log('🎮 Use budedexDebug.getState() to inspect app state');
+  console.log('🎮 Use budedexDebug.clearUserData() to reset progress');
+</script>
+
+<style>
+  /* Ensure grid layout works properly */
+  .pokedex-layout {
+    height: 100vh;
+    overflow: hidden;
+  }
+  
+  /* Animation for error messages */
+  .tui-container {
+    animation: slideDown 0.3s ease;
+  }
+  
+  @keyframes slideDown {
+    from {
+      transform: translateY(-100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  
+  /* Loading indicator pulse */
+  #loading-indicator {
+    animation: pulse 1s infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  
+  /* Mobile optimizations */
+  @media (max-width: 768px) {
+    .pokedex-layout {
+      height: 100vh;
+      overflow-y: auto;
+    }
+  }
+</style>

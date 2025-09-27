@@ -18,6 +18,7 @@ export interface Strain {
 }
 
 export interface StrainComplete extends Strain {
+    strain_id?: number;
     aliases?: string;
     positive_effects?: string;
     negative_effects?: string;

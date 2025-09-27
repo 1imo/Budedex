@@ -99,10 +99,14 @@ export class StrainRepository {
         const countResult = await this.pool.query(countQuery, params);
         const total = parseInt(countResult.rows[0].total);
 
-        // Get strains with complete data including genetics
+        // Get strains with complete data including genetics and strain ID
         const strainsQuery = `
-            SELECT * FROM strain_complete 
-            ${whereClause} 
+            WITH numbered_strains AS (
+                SELECT ROW_NUMBER() OVER () as strain_id, sc.*
+                FROM strain_complete sc
+            )
+            SELECT * FROM numbered_strains 
+            ${whereClause.replace('strain_complete', 'numbered_strains')} 
             ${orderClause}
             LIMIT $${++paramCount} OFFSET $${++paramCount}
         `;
@@ -122,6 +126,41 @@ export class StrainRepository {
         const query = 'SELECT * FROM strain_complete WHERE name = $1';
         const result = await this.pool.query(query, [name]);
         return result.rows[0] || null;
+    }
+
+    async searchExact(query: string): Promise<StrainComplete | null> {
+        const searchQuery = query.trim().toLowerCase();
+        
+        // First try exact name match with strain ID
+        let result = await this.pool.query(`
+            WITH numbered_strains AS (
+                SELECT ROW_NUMBER() OVER () as strain_id, sc.*
+                FROM strain_complete sc
+            )
+            SELECT * FROM numbered_strains WHERE LOWER(name) = $1
+        `, [searchQuery]);
+        
+        if (result.rows.length > 0) {
+            return result.rows[0];
+        }
+        
+        // Then try exact alias match with strain ID
+        result = await this.pool.query(`
+            WITH numbered_strains AS (
+                SELECT ROW_NUMBER() OVER () as strain_id, sc.*
+                FROM strain_complete sc
+            )
+            SELECT ns.* FROM numbered_strains ns
+            JOIN strain_akas sa ON ns.name = sa.strain_name
+            WHERE LOWER(sa.aka) = $1
+            LIMIT 1
+        `, [searchQuery]);
+        
+        if (result.rows.length > 0) {
+            return result.rows[0];
+        }
+        
+        return null;
     }
 
     async search(searchRequest: SearchStrainsRequest): Promise<{ strains: StrainSearch[], total: number }> {

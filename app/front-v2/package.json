@@ -1,0 +1,40 @@
+{
+  "name": "budedex-v2-frontend",
+  "type": "module",
+  "version": "2.0.0",
+  "scripts": {
+    "dev": "astro dev --host --port 3001",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/react": "^3.0.0",
+    "@astrojs/tailwind": "^5.0.0",
+    "@hackernoon/pixel-icon-library": "^1.0.6",
+    "@radix-ui/react-avatar": "^1.1.10",
+    "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-hover-card": "^1.1.15",
+    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-menubar": "^1.1.16",
+    "@radix-ui/react-separator": "^1.1.7",
+    "@radix-ui/react-slot": "^1.2.3",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "astro": "^4.0.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "lucide-react": "^0.292.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tailwind-merge": "^2.6.0",
+    "tailwindcss": "^3.3.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.3.0",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "^5.2.0"
+  }
+}

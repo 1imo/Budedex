@@ -1,0 +1,74 @@
+---
+export interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+import '../styles/globals.css';
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="description" content="Budedex V2 - Pokédex-style cannabis strain database with TUI interface" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+    
+    <!-- Preload fonts -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" as="style" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" />
+  </head>
+  <body class="bg-background text-foreground antialiased">
+    <main class="min-h-screen">
+      <slot />
+    </main>
+
+    <style>
+      html {
+        font-family: "Press Start 2P", "Courier New", monospace;
+        overflow-x: hidden;
+      }
+      
+      body {
+        image-rendering: pixelated;
+        image-rendering: -moz-crisp-edges;
+        image-rendering: crisp-edges;
+      }
+      
+      /* Disable text selection for a more game-like feel */
+      .no-select {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+      }
+      
+      /* Custom scrollbar for webkit browsers */
+      ::-webkit-scrollbar {
+        width: 12px;
+        height: 12px;
+      }
+      
+      ::-webkit-scrollbar-track {
+        background: hsl(var(--muted));
+        border: 1px solid hsl(var(--border));
+      }
+      
+      ::-webkit-scrollbar-thumb {
+        background: hsl(var(--tui-green));
+        border: 1px solid hsl(var(--tui-gray));
+      }
+      
+      ::-webkit-scrollbar-thumb:hover {
+        background: hsl(var(--tui-yellow));
+      }
+      
+      ::-webkit-scrollbar-corner {
+        background: hsl(var(--muted));
+      }
+    </style>
+  </body>
+</html>

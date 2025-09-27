@@ -1,0 +1,205 @@
+---
+interface Strain {
+  name: string;
+  url: string;
+  type: string;
+  image_path?: string;
+  image_url?: string;
+  category: string;
+}
+
+interface Props {
+  strains: Strain[];
+  initialPage?: number;
+  totalPages?: number;
+}
+
+const { strains = [], initialPage = 1, totalPages = 1 } = Astro.props;
+
+// Calculate grid size based on strain count - use fixed columns for consistency
+const gridCols = 16; // Fixed 16 columns for desktop, responsive via CSS
+---
+
+<div class="pokedex-grid-area tui-scrollbar" id="grid-container">
+  <div class="pokedex-screen p-2">
+    <div 
+      class="pokedex-grid"
+      id="strain-grid"
+      style={`grid-template-columns: repeat(${gridCols}, 64px); justify-content: center;`}
+      data-initial-page={initialPage}
+      data-total-pages={totalPages}
+    >
+      {strains.map((strain: Strain, index: number) => {
+        return (
+          <div
+            class="strain-sprite"
+            data-strain={strain.name}
+            data-strain-data={JSON.stringify(strain)}
+            data-strain-index={index}
+          >
+            <img
+              id={`strain-img-${index}`}
+              src={strain.image_url || strain.image_path || '/placeholder.png'}
+              alt={strain.name}
+              loading="lazy"
+            />
+            <div class="strain-id">#{index + 1}</div>
+          </div>
+        );
+      })}
+    </div>
+    <!-- Loading spinner for pagination -->
+    <div id="pagination-loading" class="loading-spinner hidden">
+      <div class="tui-container p-3 text-center">
+        <div class="text-tui-green text-xs uppercase tracking-wider">Loading more strains...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('🎮 PokedexGrid loaded');
+    
+    // Function to apply ghost effect to ALL images - NUCLEAR VERSION
+    function enforceGhostEffect() {
+      // Target all possible selectors
+      const allImages = document.querySelectorAll(`
+        img[id^="strain-img-"],
+        .pokedex-grid img, 
+        .strain-sprite img, 
+        .strain-image, 
+        .force-ghost,
+        img[loading="lazy"]
+      `);
+      
+      allImages.forEach((img, index) => {
+        const htmlImg = img as HTMLImageElement;
+        
+        // Apply ghost effect by adjusting image properties
+        htmlImg.style.setProperty('filter', 'grayscale(100%) brightness(0.54) contrast(40)', 'important');
+        htmlImg.style.setProperty('opacity', '0.6', 'important');
+        htmlImg.style.setProperty('transition', 'none', 'important');
+        htmlImg.style.setProperty('background', 'white', 'important');
+        
+        // Also set the class to force CSS cascade
+        htmlImg.classList.add('force-ghost');
+        
+        // Log computed styles to verify
+        const computedStyles = window.getComputedStyle(htmlImg);
+        console.log(`👻 Image ${index + 1} (${htmlImg.id || 'no-id'}):`, {
+          src: htmlImg.src.substring(htmlImg.src.lastIndexOf('/') + 1),
+          filter: computedStyles.filter,
+          opacity: computedStyles.opacity,
+          background: computedStyles.background
+        });
+      });
+      
+      console.log(`� NUCLEAR GHOST ENFORCEMENT: ${allImages.length} images processed`);
+    }
+
+    // Apply immediately
+    enforceGhostEffect();
+    
+    // Apply when images load
+    setTimeout(enforceGhostEffect, 100);
+    setTimeout(enforceGhostEffect, 500);
+    setTimeout(enforceGhostEffect, 1000);
+    
+    // NUCLEAR OPTION: Force ghost effect every 500ms to catch any CSS overrides
+    setInterval(() => {
+      enforceGhostEffect();
+    }, 500);
+
+    // Handle strain clicks
+    document.addEventListener('click', (e) => {
+      const strainSprite = (e.target as HTMLElement).closest('.strain-sprite');
+      if (strainSprite) {
+        const strainData = strainSprite.getAttribute('data-strain-data');
+        if (strainData) {
+          try {
+            const strain = JSON.parse(strainData);
+            // Dispatch custom event for parent components to handle
+            const event = new CustomEvent('strain-selected', { 
+              detail: strain,
+              bubbles: true 
+            });
+            strainSprite.dispatchEvent(event);
+          } catch (error) {
+            console.error('Error parsing strain data:', error);
+          }
+        }
+      }
+    });
+  });
+</script>
+
+<style>
+  /* Force ghost effect on ALL images */
+  img[id^="strain-img-"],
+  .pokedex-grid .strain-sprite img,
+  .strain-sprite img,
+  .strain-image,
+  .force-ghost,
+  img[loading="lazy"] {
+    filter: grayscale(100%) brightness(0.4) contrast(25) !important;
+    opacity: 0.6 !important;
+    transition: none !important;
+    background: white !important;
+  }
+
+  .pokedex-grid-area {
+    flex: 1;
+    overflow-y: auto;
+    background: white !important;
+  }
+
+  .pokedex-screen {
+    background: white !important;
+    border: none !important;
+  }
+
+  .pokedex-grid {
+    display: grid;
+    gap: 2px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 8px;
+    background: white !important;
+  }
+
+  .strain-sprite {
+    width: 64px;
+    height: 64px;
+    background: white !important;
+    border: 1px solid #333 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    cursor: pointer;
+    transition: border-color 0.1s;
+  }
+
+  .strain-sprite:hover {
+    border-color: #666 !important;
+  }
+
+  .strain-sprite img {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+  }
+
+  .strain-id {
+    position: absolute;
+    bottom: -1px;
+    right: -1px;
+    background: white;
+    color: #333;
+    font-size: 8px;
+    padding: 1px 2px;
+    border: 1px solid #333;
+    line-height: 1;
+  }
+</style>
