@@ -48,8 +48,10 @@ const gridCols = 10; // 10 columns for desktop, responsive via CSS
       })}
   <!-- Loading spinner for pagination -->
   <div id="pagination-loading" class="loading-spinner hidden">
-    <div class="tui-container p-3 text-center">
-      <div class="text-tui-green text-xs uppercase tracking-wider">Loading more strains...</div>
+    <div class="tui-container p-4 text-center">
+      <div class="text-tui-green text-sm uppercase tracking-wider mb-2">🔄 LOADING MORE STRAINS...</div>
+      <div class="text-tui-cyan text-xs">Fetching next batch of data...</div>
+      <div class="text-tui-yellow text-xs mt-2">Please wait...</div>
     </div>
   </div>
 </div>
@@ -128,13 +130,11 @@ const gridCols = 10; // 10 columns for desktop, responsive via CSS
     // Setup pagination and lazy loading
     setupLazyLoading();
     
-    // Load second page immediately after initial load
-    setTimeout(() => {
-      if (paginationState.totalPages > 1 && !paginationState.loadedPages.has(2)) {
-        console.log('🔄 Loading second page immediately...');
-        loadPage(2);
-      }
-    }, 1000);
+    // Load first 3 pages immediately after initial load for smooth experience
+    if (paginationState.totalPages > 1) {
+      console.log('🔄 Loading next 2 pages immediately for smooth scrolling...');
+      loadMultiplePages(2, 2); // Load pages 2 and 3
+    }
 
     // Apply ghost effect periodically
     enforceGhostEffect();
@@ -182,14 +182,14 @@ const gridCols = 10; // 10 columns for desktop, responsive via CSS
         
         console.log(`📊 Scroll: ${Math.round(scrollPercentage * 100)}%, Pages loaded: ${paginationState.loadedPages.size}/${paginationState.totalPages}`);
         
-        // Load next page when 70% scrolled to the end (more aggressive)
+        // Load next 3 pages when 70% scrolled to the end 
         if (scrollPercentage > 0.7 && !paginationState.isLoading) {
           const nextPage = Math.max(...paginationState.loadedPages) + 1;
           console.log(`🎯 Scroll trigger: ${Math.round(scrollPercentage * 100)}%, next page: ${nextPage}, total: ${paginationState.totalPages}`);
           
           if (nextPage <= paginationState.totalPages) {
-            console.log(`🔄 Triggering lazy load for page ${nextPage}`);
-            loadPage(nextPage);
+            console.log(`🔄 Triggering batch load starting from page ${nextPage}`);
+            loadMultiplePages(nextPage, 3);
           } else {
             console.log('📝 All pages loaded');
           }
@@ -200,62 +200,92 @@ const gridCols = 10; // 10 columns for desktop, responsive via CSS
     console.log('✅ Lazy loading setup complete');
   }
 
-  // Load a specific page of strains
-  async function loadPage(pageNumber) {
-    if (paginationState.loadedPages.has(pageNumber) || paginationState.isLoading) {
-      console.log(`⚠️ Page ${pageNumber} already loaded or loading in progress`);
+  // Load multiple pages sequentially 
+  async function loadMultiplePages(startPage, count) {
+    if (paginationState.isLoading) {
+      console.log(`⚠️ Already loading, skipping batch load`);
       return;
     }
     
-    console.log(`🔄 Loading page ${pageNumber}...`);
+    console.log(`🔄 Loading ${count} pages starting from ${startPage}...`);
     setLoadingState(true);
     
     try {
-      const grid = document.getElementById('strain-grid');
-      const currentApiUrl = grid?.dataset.apiUrl || 'http://localhost:4002';
-      console.log(`🔗 API Request to: ${currentApiUrl}/api/gql`);
+      for (let i = 0; i < count; i++) {
+        const pageNumber = startPage + i;
+        
+        // Skip if page already loaded or beyond total pages
+        if (paginationState.loadedPages.has(pageNumber) || pageNumber > paginationState.totalPages) {
+          console.log(`⏭️ Skipping page ${pageNumber} (already loaded or beyond total)`);
+          continue;
+        }
+        
+        console.log(`📖 Loading page ${pageNumber} (${i + 1}/${count})...`);
+        await loadSinglePage(pageNumber);
+        
+        // Small delay between requests to avoid overwhelming the server
+        if (i < count - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
       
-      const response = await fetch(`${currentApiUrl}/api/gql`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: `
-            query GetStrains($page: Int!, $limit: Int!) {
-              strains(page: $page, limit: $limit) {
-                strains {
-                  name url type thc cbd rating review_count top_effect category 
-                  image_path image_url description aliases positive_effects 
-                  negative_effects flavors terpenes medical_benefits parents children
-                }
-                pageInfo { hasNextPage hasPreviousPage currentPage totalPages total }
-              }
-            }
-          `,
-          variables: { page: pageNumber, limit: 100 }
-        })
-      });
-      
-      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      
-      const data = await response.json();
-      if (data.errors) throw new Error(data.errors[0].message);
-      
-      const newStrains = data.data.strains.strains;
-      const pageInfo = data.data.strains.pageInfo;
-      
-      appendStrainsToGrid(newStrains);
-      paginationState.loadedPages.add(pageNumber);
-      paginationState.totalPages = pageInfo.totalPages;
-      paginationState.currentPage = Math.max(paginationState.currentPage, pageNumber);
-      
-      console.log(`✅ Loaded page ${pageNumber} with ${newStrains.length} strains. Total loaded: ${paginationState.loadedPages.size}/${paginationState.totalPages} pages`);
+      console.log(`✅ Batch load complete! Loaded pages ${startPage}-${startPage + count - 1}`);
     } catch (error) {
-      console.error(`❌ Failed to load page ${pageNumber}:`, error);
-      // Show error to user
-      showError(`Failed to load page ${pageNumber}: ${error.message}`);
+      console.error(`❌ Batch loading failed:`, error);
     } finally {
       setLoadingState(false);
     }
+  }
+
+  // Load a specific page of strains (internal function)
+  async function loadSinglePage(pageNumber) {
+    if (paginationState.loadedPages.has(pageNumber)) {
+      console.log(`⚠️ Page ${pageNumber} already loaded`);
+      return;
+    }
+    
+    const grid = document.getElementById('strain-grid');
+    const currentApiUrl = grid?.dataset.apiUrl || 'http://localhost:4002';
+    
+    const response = await fetch(`${currentApiUrl}/api/gql`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: `
+          query GetStrains($page: Int!, $limit: Int!) {
+            strains(page: $page, limit: $limit) {
+              strains {
+                strain_id name url type thc cbd rating review_count top_effect category 
+                image_path image_url description aliases positive_effects 
+                negative_effects flavors terpenes medical_benefits parents children
+              }
+              pageInfo { hasNextPage hasPreviousPage currentPage totalPages total }
+            }
+          }
+        `,
+        variables: { page: pageNumber, limit: 100 }
+      })
+    });
+    
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    
+    const data = await response.json();
+    if (data.errors) throw new Error(data.errors[0].message);
+    
+    const newStrains = data.data.strains.strains;
+    const pageInfo = data.data.strains.pageInfo;
+    
+    appendStrainsToGrid(newStrains);
+    paginationState.loadedPages.add(pageNumber);
+    paginationState.totalPages = pageInfo.totalPages;
+    paginationState.currentPage = Math.max(paginationState.currentPage, pageNumber);
+    
+    console.log(`✅ Loaded page ${pageNumber} with ${newStrains.length} strains`);
+  }
+
+  // Load a specific page of strains (public function for backward compatibility)
+  async function loadPage(pageNumber) {
+    return loadMultiplePages(pageNumber, 1);
   }
 
   // Add new strains to the grid
@@ -432,19 +462,10 @@ const gridCols = 10; // 10 columns for desktop, responsive via CSS
     width: 100% !important;
     height: 0 !important;
     padding-bottom: 100% !important;
-    background: white !important;
-    border: 2px solid black !important;
-    border-bottom: 4px solid black !important;
+    background: transparent !important;
     position: relative !important;
     cursor: pointer !important;
-    transition: border-color 0.1s !important;
     overflow: hidden !important;
-  }
-
-  .strain-sprite:hover,
-  .pokedex-grid > .strain-sprite:hover {
-    border-color: #666 !important;
-    border-bottom-color: #666 !important;
   }
 
   .strain-sprite img,
@@ -475,12 +496,17 @@ const gridCols = 10; // 10 columns for desktop, responsive via CSS
 
   /* Loading spinner styles */
   .loading-spinner {
-    margin-top: 16px;
-    margin-bottom: 16px;
+    grid-column: 1 / -1; /* Span entire grid width */
+    margin: 20px 0;
+    padding: 0 20px;
+    z-index: 100;
   }
   
   .loading-spinner .tui-container {
     animation: pulse 1.5s ease-in-out infinite;
+    border: 2px solid hsl(var(--tui-green));
+    background: hsl(var(--card));
+    box-shadow: 0 0 15px hsl(var(--tui-green) / 0.5);
   }
   
   @keyframes pulse {

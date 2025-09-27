@@ -12,7 +12,6 @@ interface Strain {
   image_path?: string;
   image_url?: string;
   description?: string;
-  aliases?: string[];
   positive_effects?: string[];
   negative_effects?: string[];
   flavors?: string[];
@@ -34,7 +33,17 @@ const { selectedStrain = null } = Astro.props;
   <div class="strain-detail-pane" id="strain-detail-pane">
     {selectedStrain ? (
       <!-- Strain Selected -->
-      <div class="strain-info">
+      <div class="strain-info bg-white">
+        <!-- Image -->
+        <div class="mb-6">
+          <img
+            src={(selectedStrain.image_url ? selectedStrain.image_url.split('?')[0] : `/api/images/${selectedStrain.image_path}`)}
+            alt={selectedStrain.name}
+            class="w-full aspect-square object-contain"
+            loading="lazy"
+          />
+        </div>
+        
         <!-- Header -->
         <div class="text-center mb-4">
           <div class="text-sm text-tui-cyan uppercase tracking-wider mb-1">
@@ -47,16 +56,6 @@ const { selectedStrain = null } = Astro.props;
             <span class="strain-type">{selectedStrain.category}</span>
             <span class="strain-type">{selectedStrain.type}</span>
           </div>
-        </div>
-        
-        <!-- Image -->
-        <div class="text-center mb-4">
-          <img
-            src={selectedStrain.image_url || `/api/images/${selectedStrain.image_path}`}
-            alt={selectedStrain.name}
-            class="strain-detail-image"
-            loading="lazy"
-          />
         </div>
         
         <!-- Quick Stats Grid -->
@@ -244,240 +243,290 @@ const { selectedStrain = null } = Astro.props;
   
   // Listen for strain selection
   window.addEventListener('strain-selected', (e: any) => {
-    const strain = e.detail.strain;
+    const strain = e.detail;  // PokedexGrid sends strain directly as e.detail
     currentStrain = strain;
     updateDetailPane(strain);
+    console.log('🔧 StrainDetailPane received strain:', strain.name);
   });
   
   function updateDetailPane(strain: any) {
     const detailPane = document.getElementById('strain-detail-pane');
     if (!detailPane) return;
     
+    // Check if strain is seen
+    const seenStrains = JSON.parse(localStorage.getItem('seen-strains') || '[]');
+    const isSeen = seenStrains.includes(strain.name);
+    
+    console.log(`🔍 Strain ${strain.name} is ${isSeen ? 'SEEN' : 'UNSEEN'}`);
+    
     const html = `
-      <div class="strain-info">
-        <!-- Header -->
-        <div class="text-center mb-4">
-          <div class="text-sm text-tui-cyan uppercase tracking-wider mb-1">
-            #${strain.strainNumber || 'XXX'}
-          </div>
-          <h2 class="text-lg text-tui-green uppercase tracking-wider mb-1">
-            ${strain.name}
-          </h2>
-          <div class="flex justify-center gap-2 mb-2">
-            <span class="strain-type">${strain.category || 'HYBRID'}</span>
-            <span class="strain-type">${strain.type || 'UNKNOWN'}</span>
-          </div>
-        </div>
-        
+      <div class="strain-info bg-white">
         <!-- Image -->
-        <div class="text-center mb-4">
+        <div class="mb-6">
           <img
-            src="${strain.image_url || `/api/images/${strain.image_path}`}"
+            src="${strain.image_url ? strain.image_url.split('?')[0] : `/api/images/${strain.image_path}`}"
             alt="${strain.name}"
-            class="strain-detail-image"
+            class="w-full aspect-square object-contain ${isSeen ? '' : 'force-ghost'}"
             loading="lazy"
           />
         </div>
         
-        <!-- Quick Stats Grid -->
-        <div class="grid grid-cols-2 gap-2 mb-4">
-          ${strain.thc ? `
-            <div class="strain-stat">
-              <span class="text-tui-red">THC:</span>
-              <span class="text-tui-white">${strain.thc}%</span>
+        <!-- Header -->
+        <div class="mb-6">
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-sm text-tui-cyan uppercase tracking-wider">
+              #${strain.strainNumber || 'XXX'}
             </div>
-          ` : ''}
-          ${strain.cbd ? `
-            <div class="strain-stat">
-              <span class="text-tui-blue">CBD:</span>
-              <span class="text-tui-white">${strain.cbd}%</span>
-            </div>
-          ` : ''}
-          ${strain.rating ? `
-            <div class="strain-stat">
-              <span class="text-tui-yellow">RATING:</span>
-              <span class="text-tui-white">${strain.rating}/5</span>
-            </div>
-          ` : ''}
-          ${strain.review_count ? `
-            <div class="strain-stat">
-              <span class="text-tui-cyan">REVIEWS:</span>
-              <span class="text-tui-white">${strain.review_count}</span>
-            </div>
-          ` : ''}
+            ${isSeen && strain.rating ? `
+              <div class="flex items-center gap-1">
+                ${Array.from({length: Math.floor(strain.rating)}, () => '★').join('')}
+                <span class="text-xs text-tui-yellow ml-1">${strain.rating}/5</span>
+              </div>
+            ` : ''}
+          </div>
+          <h1 class="text-2xl text-tui-green uppercase tracking-wider font-bold mb-3">
+            ${isSeen ? strain.name : '???'}
+          </h1>
+          <div class="flex items-center gap-4 mb-4">
+            <span class="text-sm text-tui-gray uppercase">
+              ${isSeen ? (strain.category || 'HYBRID') : '???'}
+            </span>
+            ${isSeen && strain.thc ? `
+              <span class="text-sm text-tui-gray uppercase">
+                THC: ${strain.thc.replace('THC ', '')}%
+              </span>
+            ` : (!isSeen ? `
+              <span class="text-sm text-tui-gray uppercase">
+                THC: ???%
+              </span>
+            ` : '')}
+          </div>
         </div>
         
         <!-- Description -->
-        ${strain.description ? `
-          <div class="mb-4">
-            <div class="text-xs text-tui-green uppercase mb-2">DESCRIPTION:</div>
-            <div class="tui-panel p-2 text-xs">
-              <p class="text-foreground/90 leading-relaxed">
-                ${strain.description.slice(0, 200)}${strain.description.length > 200 ? '...' : ''}
-              </p>
-            </div>
+        <div class="mb-6">
+          <div class="text-sm font-bold text-tui-green mb-3 uppercase">Description</div>
+          <div class="bg-gray-50 p-4 rounded-lg text-sm leading-relaxed">
+            ${isSeen && strain.description 
+              ? `${strain.description.slice(0, 200)}${strain.description.length > 200 ? '...' : ''}`
+              : 'This strain data is not yet available. Catch this strain to unlock its details!'
+            }
           </div>
-        ` : ''}
+        </div>
         
         <!-- Primary Effect -->
-        ${strain.top_effect ? `
-          <div class="mb-4">
-            <div class="text-xs text-tui-green uppercase mb-1">PRIMARY EFFECT:</div>
-            <div class="tui-panel p-2 text-center">
-              <span class="text-sm text-tui-yellow uppercase">
+        ${isSeen && strain.top_effect ? `
+          <div class="mb-6">
+            <div class="text-sm font-bold text-tui-green mb-3 uppercase">Primary Effect</div>
+            <div class="bg-yellow-50 border border-yellow-200 p-4 rounded-lg text-center">
+              <span class="text-lg font-bold text-yellow-800 uppercase">
                 ${strain.top_effect}
               </span>
             </div>
           </div>
-        ` : ''}
+        ` : (!isSeen ? `
+          <div class="mb-6">
+            <div class="text-sm font-bold text-tui-green mb-3 uppercase">Primary Effect</div>
+            <div class="bg-gray-50 border border-gray-200 p-4 rounded-lg text-center">
+              <span class="text-lg font-bold text-gray-400 uppercase">
+                ???
+              </span>
+            </div>
+          </div>
+        ` : '')}
         
-        <!-- Effects Grid -->
-        <div class="grid grid-cols-1 gap-3 mb-4">
-          ${strain.positive_effects && strain.positive_effects.length > 0 ? `
-            <div>
-              <div class="text-xs text-tui-green uppercase mb-1">POSITIVE EFFECTS:</div>
-              <div class="flex flex-wrap gap-1">
-                ${Array.isArray(strain.positive_effects) 
-                  ? strain.positive_effects.slice(0, 6).map(effect => `
-                    <span class="text-xs px-2 py-1 bg-tui-green/20 text-tui-green border border-tui-green/50">
-                      ${effect}
-                    </span>
-                  `).join('')
-                  : strain.positive_effects.split(',').slice(0, 6).map(effect => `
-                    <span class="text-xs px-2 py-1 bg-tui-green/20 text-tui-green border border-tui-green/50">
-                      ${effect.trim()}
-                    </span>
-                  `).join('')
-                }
-              </div>
+        <!-- Effects & Properties Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8 mb-6">
+          <div>
+            <h4 class="font-medium text-green-600 mb-3 uppercase">Positive Effects</h4>
+            <div class="flex flex-wrap gap-2">
+              ${isSeen && strain.positive_effects && strain.positive_effects.length > 0
+                ? (Array.isArray(strain.positive_effects) 
+                    ? strain.positive_effects.slice(0, 6).map(effect => `
+                      <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
+                        ${effect}
+                      </span>
+                    `).join('')
+                    : strain.positive_effects.split(',').slice(0, 6).map(effect => `
+                      <span class="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
+                        ${effect.trim()}
+                      </span>
+                    `).join(''))
+                : Array.from({length: 3}, () => `
+                  <span class="bg-gray-100 text-gray-500 px-3 py-1 rounded-full text-sm">
+                    ???
+                  </span>
+                `).join('')
+              }
             </div>
-          ` : ''}
+          </div>
           
-          ${strain.negative_effects && strain.negative_effects.length > 0 ? `
-            <div>
-              <div class="text-xs text-tui-red uppercase mb-1">SIDE EFFECTS:</div>
-              <div class="flex flex-wrap gap-1">
-                ${Array.isArray(strain.negative_effects)
-                  ? strain.negative_effects.slice(0, 4).map(effect => `
-                    <span class="text-xs px-2 py-1 bg-tui-red/20 text-tui-red border border-tui-red/50">
-                      ${effect}
-                    </span>
-                  `).join('')
-                  : strain.negative_effects.split(',').slice(0, 4).map(effect => `
-                    <span class="text-xs px-2 py-1 bg-tui-red/20 text-tui-red border border-tui-red/50">
-                      ${effect.trim()}
-                    </span>
-                  `).join('')
-                }
-              </div>
+          <div>
+            <h4 class="font-medium text-red-600 mb-3 uppercase">Side Effects</h4>
+            <div class="flex flex-wrap gap-2">
+              ${isSeen && strain.negative_effects && strain.negative_effects.length > 0
+                ? (Array.isArray(strain.negative_effects)
+                    ? strain.negative_effects.slice(0, 4).map(effect => `
+                      <span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm">
+                        ${effect}
+                      </span>
+                    `).join('')
+                    : strain.negative_effects.split(',').slice(0, 4).map(effect => `
+                      <span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm">
+                        ${effect.trim()}
+                      </span>
+                    `).join(''))
+                : Array.from({length: 3}, () => `
+                  <span class="bg-gray-100 text-gray-500 px-3 py-1 rounded-full text-sm">
+                    ???
+                  </span>
+                `).join('')
+              }
             </div>
-          ` : ''}
+          </div>
           
-          ${strain.flavors && strain.flavors.length > 0 ? `
-            <div>
-              <div class="text-xs text-tui-cyan uppercase mb-1">FLAVORS:</div>
-              <div class="flex flex-wrap gap-1">
-                ${Array.isArray(strain.flavors)
-                  ? strain.flavors.slice(0, 5).map(flavor => `
-                    <span class="text-xs px-2 py-1 bg-tui-cyan/20 text-tui-cyan border border-tui-cyan/50">
-                      ${flavor}
-                    </span>
-                  `).join('')
-                  : strain.flavors.split(',').slice(0, 5).map(flavor => `
-                    <span class="text-xs px-2 py-1 bg-tui-cyan/20 text-tui-cyan border border-tui-cyan/50">
-                      ${flavor.trim()}
-                    </span>
-                  `).join('')
-                }
-              </div>
+          <div>
+            <h4 class="font-medium text-purple-600 mb-3 uppercase">Flavor Profile</h4>
+            <div class="flex flex-wrap gap-2">
+              ${isSeen && strain.flavors && strain.flavors.length > 0
+                ? (Array.isArray(strain.flavors)
+                    ? strain.flavors.slice(0, 5).map(flavor => `
+                      <span class="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm">
+                        ${flavor}
+                      </span>
+                    `).join('')
+                    : strain.flavors.split(',').slice(0, 5).map(flavor => `
+                      <span class="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm">
+                        ${flavor.trim()}
+                      </span>
+                    `).join(''))
+                : Array.from({length: 2}, () => `
+                  <span class="bg-gray-100 text-gray-500 px-3 py-1 rounded-full text-sm">
+                    ???
+                  </span>
+                `).join('')
+              }
             </div>
-          ` : ''}
-        </div>
-        
-        <!-- Terpenes & Medical -->
-        ${(strain.terpenes && strain.terpenes.length > 0) || (strain.medical_benefits && strain.medical_benefits.length > 0) ? `
-          <div class="grid grid-cols-1 gap-3 mb-4">
-            ${strain.terpenes && strain.terpenes.length > 0 ? `
-              <div>
-                <div class="text-xs text-tui-magenta uppercase mb-1">TERPENES:</div>
-                <div class="flex flex-wrap gap-1">
-                  ${Array.isArray(strain.terpenes)
+          </div>
+          
+          <div>
+            <h4 class="font-medium text-indigo-600 mb-3 uppercase">Terpene Profile</h4>
+            <div class="flex flex-wrap gap-2">
+              ${isSeen && strain.terpenes && strain.terpenes.length > 0
+                ? (Array.isArray(strain.terpenes)
                     ? strain.terpenes.slice(0, 4).map(terpene => `
-                      <span class="text-xs px-2 py-1 bg-purple-500/20 text-purple-400 border border-purple-500/50">
+                      <span class="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm">
                         ${terpene}
                       </span>
                     `).join('')
                     : strain.terpenes.split(',').slice(0, 4).map(terpene => `
-                      <span class="text-xs px-2 py-1 bg-purple-500/20 text-purple-400 border border-purple-500/50">
+                      <span class="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full text-sm">
                         ${terpene.trim()}
                       </span>
-                    `).join('')
-                  }
-                </div>
-              </div>
-            ` : ''}
-            
-            ${strain.medical_benefits && strain.medical_benefits.length > 0 ? `
-              <div>
-                <div class="text-xs text-tui-blue uppercase mb-1">MEDICAL:</div>
-                <div class="flex flex-wrap gap-1">
-                  ${Array.isArray(strain.medical_benefits)
-                    ? strain.medical_benefits.slice(0, 3).map(benefit => `
-                      <span class="text-xs px-2 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/50">
-                        ${benefit.replace(/\\s*\\(\\d+%\\)/, '')}
-                      </span>
-                    `).join('')
-                    : strain.medical_benefits.split(',').slice(0, 3).map(benefit => `
-                      <span class="text-xs px-2 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/50">
-                        ${benefit.trim().replace(/\\s*\\(\\d+%\\)/, '')}
-                      </span>
-                    `).join('')
-                  }
-                </div>
-              </div>
-            ` : ''}
-          </div>
-        ` : ''}
-        
-        <!-- Genetics -->
-        ${(strain.parents && strain.parents.length > 0) || (strain.children && strain.children.length > 0) ? `
-          <div class="mb-4">
-            <div class="text-xs text-tui-green uppercase mb-2">GENETICS:</div>
-            <div class="tui-panel p-2 space-y-2">
-              ${strain.parents && strain.parents.length > 0 ? `
-                <div>
-                  <span class="text-xs text-tui-yellow uppercase">PARENTS:</span>
-                  <div class="text-xs text-foreground/80 mt-1">
-                    ${Array.isArray(strain.parents) 
-                      ? strain.parents.slice(0, 2).join(' × ')
-                      : strain.parents.split(',').slice(0, 2).map(p => p.trim()).join(' × ')
-                    }
-                  </div>
-                </div>
-              ` : ''}
-              ${strain.children && strain.children.length > 0 ? `
-                <div>
-                  <span class="text-xs text-tui-yellow uppercase">CHILDREN:</span>
-                  <div class="text-xs text-foreground/80 mt-1">
-                    ${Array.isArray(strain.children)
-                      ? strain.children.slice(0, 3).join(', ')
-                      : strain.children.split(',').slice(0, 3).map(c => c.trim()).join(', ')
-                    }
-                  </div>
-                </div>
-              ` : ''}
+                    `).join(''))
+                : Array.from({length: 3}, () => `
+                  <span class="bg-gray-100 text-gray-500 px-3 py-1 rounded-full text-sm">
+                    ???
+                  </span>
+                `).join('')
+              }
             </div>
           </div>
-        ` : ''}
+        </div>
         
-        <!-- Actions -->
-        <div class="flex gap-2 mt-4">
-          <button class="tui-button primary flex-1" id="catch-btn">
-            CATCH
-          </button>
-          <button class="tui-button flex-1" id="details-btn">
-            MORE INFO
-          </button>
+        <!-- Medical Benefits -->
+        ${isSeen && strain.medical_benefits && strain.medical_benefits.length > 0 ? `
+          <div class="bg-card rounded-none px-0 py-6">
+            <h3 class="text-lg font-bold mb-4 uppercase text-primary">Medical Benefits</h3>
+            <div class="space-y-4">
+              ${(Array.isArray(strain.medical_benefits)
+                ? strain.medical_benefits.slice(0, 3)
+                : strain.medical_benefits.split(',').slice(0, 3)
+              ).map(benefit => {
+                const match = benefit.trim().match(/^(.*?)\\s*\\((\\d+)%\\)$/);
+                if (match) {
+                  const [, condition, percentage] = match;
+                  return `
+                    <div class="space-y-2">
+                      <div class="flex justify-between items-center">
+                        <span class="font-medium">${condition}</span>
+                        <span class="text-sm text-muted-foreground">${percentage}% of users</span>
+                      </div>
+                      <div class="w-full bg-blue-100 rounded-none h-2 overflow-hidden">
+                        <div class="h-full bg-blue-500 rounded-none transition-all duration-300" style="width: ${percentage}%"></div>
+                      </div>
+                    </div>
+                  `;
+                } else {
+                  return `
+                    <div class="flex flex-wrap gap-2">
+                      <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">
+                        ${benefit.trim()}
+                      </span>
+                    </div>
+                  `;
+                }
+              }).join('')}
+            </div>
+          </div>
+        ` : (!isSeen ? `
+          <div class="bg-card rounded-none px-0 py-6">
+            <h3 class="text-lg font-bold mb-4 uppercase text-primary">Medical Benefits</h3>
+            <div class="space-y-4">
+              ${Array.from({length: 3}, () => `
+                <div class="space-y-2">
+                  <div class="flex justify-between items-center">
+                    <span class="font-medium text-gray-400">???</span>
+                    <span class="text-sm text-gray-400">???% of users</span>
+                  </div>
+                  <div class="w-full bg-gray-100 rounded-none h-2 overflow-hidden">
+                    <div class="h-full bg-gray-300 rounded-none" style="width: 0%"></div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : '')}
+        
+        <!-- Genetics -->
+        <div class="mb-6">
+          <h3 class="text-lg font-bold mb-4 uppercase text-primary">Genetics</h3>
+          <div class="bg-gray-50 p-4 rounded-lg space-y-3">
+            <div>
+              <span class="font-bold text-yellow-700 uppercase">Parents:</span>
+              <div class="text-sm text-gray-700 mt-1">
+                ${isSeen && strain.parents && strain.parents.length > 0
+                  ? (Array.isArray(strain.parents) 
+                      ? strain.parents.slice(0, 2).join(' × ')
+                      : strain.parents.split(',').slice(0, 2).map((p: any) => p.trim()).join(' × '))
+                  : '??? × ???'
+                }
+              </div>
+            </div>
+            <div>
+              <span class="font-bold text-yellow-700 uppercase">Children:</span>
+              <div class="text-sm text-gray-700 mt-1">
+                ${isSeen && strain.children && strain.children.length > 0
+                  ? (Array.isArray(strain.children)
+                      ? strain.children.slice(0, 3).join(', ')
+                      : strain.children.split(',').slice(0, 3).map((c: any) => c.trim()).join(', '))
+                  : '???'
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Quick Actions -->
+        <div class="mb-6">
+          <div class="flex gap-3">
+            <button class="tui-button primary flex-1" id="catch-btn" title="Mark as Caught">
+              CATCH
+            </button>
+            <button class="tui-button flex-1" id="details-btn" title="More Information">
+              MORE INFO
+            </button>
+          </div>
         </div>
       </div>
     `;

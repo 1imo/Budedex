@@ -8,7 +8,14 @@ const { onSearch, searchQuery = '' } = Astro.props;
 ---
 
 <header class="tui-header pokedex-header">
-  <!-- Search Section (Left - Flexible) -->
+  <!-- Stats Section (Left) -->
+  <div class="header-section">
+    <div class="nav-box" id="seen-box">
+      <span id="seen-count">000</span>
+    </div>
+  </div>
+  
+  <!-- Search Section (Center - Flexible) -->
   <div class="header-section flex-1">
     <input
       type="text"
@@ -22,20 +29,16 @@ const { onSearch, searchQuery = '' } = Astro.props;
     </button>
   </div>
   
-  <!-- Stats Section (Right of Search) -->
-  <div class="header-section">
-    <div class="nav-box" id="seen-box">
-      <span id="seen-count">000</span>
-    </div>
-  </div>
-  
   <!-- Action Buttons (Far Right) -->
   <div class="header-section">
-    <button class="nav-box nav-button" id="leaderboard-btn">
-      LEADERBOARD
-    </button>
     <button class="nav-box nav-button" id="achievements-btn">
       ACHIEVEMENTS
+    </button>
+    <button class="nav-box nav-button" id="challenges-btn">
+      CHALLENGES
+    </button>
+    <button class="nav-box nav-button" id="leaderboard-btn">
+      LEADERBOARD
     </button>
     <button class="nav-box nav-button logout-btn" id="logout-btn">
       LOGOUT
@@ -88,6 +91,13 @@ const { onSearch, searchQuery = '' } = Astro.props;
     // TODO: Implement achievements functionality
   });
   
+  // Challenges button
+  const challengesBtn = document.getElementById('challenges-btn');
+  challengesBtn?.addEventListener('click', () => {
+    console.log('⚔️ Challenges clicked');
+    // TODO: Implement challenges functionality
+  });
+  
   // Search submit button
   const searchSubmitBtn = document.getElementById('search-submit-btn');
   searchSubmitBtn?.addEventListener('click', () => {
@@ -119,7 +129,7 @@ const { onSearch, searchQuery = '' } = Astro.props;
     const seenCount = localStorage.getItem('seen-strains')?.split(',').length || 0;
     
     const seenEl = document.getElementById('seen-count');
-    if (seenEl) seenEl.textContent = seenCount.toString().padStart(4, '0');
+    if (seenEl) seenEl.textContent = ('000' + seenCount.toString()).slice(-4);
   }
   
   // Initialize stats
@@ -188,20 +198,20 @@ const { onSearch, searchQuery = '' } = Astro.props;
   }
   
   #seen-box {
-    background: hsl(var(--tui-cyan) / 0.1);
-    color: hsl(var(--tui-cyan));
+    background: #9333ea;
+    color: white;
     font-weight: bold;
     min-width: 60px;
   }
   
   .logout-btn {
-    background: hsl(var(--destructive) / 0.1);
-    color: hsl(var(--destructive));
+    background: red;
+    color: white;
   }
   
   .logout-btn:hover {
-    background: hsl(var(--destructive));
-    color: hsl(var(--destructive-foreground));
+    background: darkred;
+    color: white;
   }
   
   /* Responsive adjustments */

@@ -182,7 +182,7 @@ const apiUrl = import.meta.env.PUBLIC_API_URL || 'http://localhost:4002';
   function selectStrain(strain) {
     appState.selectedStrain = strain;
     window.dispatchEvent(new CustomEvent('strain-selected', {
-      detail: { strain }
+      detail: strain
     }));
   }
   
@@ -366,7 +366,7 @@ const apiUrl = import.meta.env.PUBLIC_API_URL || 'http://localhost:4002';
           
           // Dispatch selection event
           window.dispatchEvent(new CustomEvent('strain-selected', {
-            detail: { strain: strainData }
+            detail: strainData
           }));
           
           // All strains stay as ghosts - no state changes
@@ -434,7 +434,8 @@ const apiUrl = import.meta.env.PUBLIC_API_URL || 'http://localhost:4002';
   
   // Listen for events
   window.addEventListener('strain-selected', (e) => {
-    appState.selectedStrain = e.detail.strain;
+    appState.selectedStrain = e.detail;
+    console.log('🎯 Strain selected:', e.detail.name);
   });
   
   window.addEventListener('strain-search', async (e) => {
@@ -473,7 +474,7 @@ const apiUrl = import.meta.env.PUBLIC_API_URL || 'http://localhost:4002';
         // Update selected strain and show in sidebar
         appState.selectedStrain = strain;
         window.dispatchEvent(new CustomEvent('strain-selected', {
-          detail: { strain }
+          detail: strain
         }));
         
         // Clear search input
